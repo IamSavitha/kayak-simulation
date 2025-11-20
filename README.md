@@ -1,1 +1,1 @@
-# Kayak Simulation Project
+# Kayak Simulation
