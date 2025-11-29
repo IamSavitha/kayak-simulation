@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Frontend Dockerfile
 FROM node:18-alpine
 
@@ -17,3 +18,17 @@ EXPOSE 3000
 
 # Start development server
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+=======
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev"]
+>>>>>>> origin/team4-billing-payment
