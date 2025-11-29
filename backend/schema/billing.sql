@@ -1,6 +1,6 @@
 CREATE TABLE billing (
     billing_id       BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id          VARCHAR(11) NOT NULL,           -- SSN format '###-##-####'
+    user_id          VARCHAR(11) NOT NULL,   
     booking_type     ENUM('FLIGHT','HOTEL','CAR') NOT NULL,
     booking_id       BIGINT NOT NULL,
     transaction_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

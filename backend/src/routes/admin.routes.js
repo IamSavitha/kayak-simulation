@@ -1,7 +1,12 @@
 const express = require('express');
 const billingRepo = require('../repositories/billing.repo');
 const { getBillingWithCache } = require('../services/billing.service');
-
+const {
+  getRevenueSummaryByMonth,
+  getRevenueByProperty,
+  getRevenueByCity,
+  getRevenueByProvider
+} = require("../repositories/billing.repo");
 const router = express.Router();
 
 function requireAdmin(req, res, next) {
@@ -50,4 +55,54 @@ router.get('/revenue-summary', async (req, res) => {
   res.json(rows);
 });
 
+router.get("/billing/revenue-by-property", async (req, res) => {
+  try {
+    const year = Number(req.query.year);
+    if (!year) {
+      return res.status(400).json({ error: "year is required and must be a number" });
+    }
+
+    const result = await getRevenueByProperty(year);
+    return res.json(result);
+  } catch (err) {
+    console.error("revenue-by-property error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/billing/revenue-by-city", async (req, res) => {
+  try {
+    const year = Number(req.query.year);
+    if (!year) {
+      return res.status(400).json({ error: "year is required and must be a number" });
+    }
+
+    const result = await getRevenueByCity(year);
+    return res.json(result);
+  } catch (err) {
+    console.error("revenue-by-city error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/billing/revenue-by-provider", async (req, res) => {
+  try {
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+
+    if (!year || !month) {
+      return res.status(400).json({
+        error: "year and month are required and must be numbers"
+      });
+    }
+
+    const result = await getRevenueByProvider(year, month);
+    return res.json(result);
+  } catch (err) {
+    console.error("revenue-by-provider error", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 module.exports = router;
+

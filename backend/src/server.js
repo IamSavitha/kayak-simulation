@@ -7,7 +7,7 @@ async function start() {
   await connectMongo();
   await startBookingConsumer();
 
-  const port = process.env.PORT || 4004;
+  const port = process.env.PORT || 8005;
   app.listen(port, () => console.log(`Billing service on :${port}`));
 }
 
