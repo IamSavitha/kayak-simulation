@@ -1,110 +1,131 @@
-"""
-Billing Service - FastAPI application for payment and billing management.
-"""
-from fastapi import FastAPI, Depends, Query, status, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from typing import Optional
+from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel
+from typing import List, Optional
 from datetime import datetime
-import logging
+from database import BillingDB
 
-from ...common.database import get_mysql_session, init_mysql_db
-from ...common.exceptions import handle_not_found
-from ...schemas.billing_schemas import (
-    PaymentRequest, BillingResponse, BillingSearchParams,
-    BillingListResponse, RefundRequest
-)
+app = FastAPI(title="Billing Service", version="2.0")
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-app = FastAPI(title="Kayak Billing Service", version="1.0.0")
-
-app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"]
-)
+db = BillingDB()
 
 
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Starting Billing Service...")
-    init_mysql_db()
+# ==========================================================
+# --------------------- MODELS -----------------------------
+# ==========================================================
+
+class PaymentRequest(BaseModel):
+    booking_id: str
+    payment_method: str  # "credit_card" or "paypal"
+    card_number: Optional[str] = None
+    card_expiry: Optional[str] = None
+    card_cvv: Optional[str] = None
+    paypal_email: Optional[str] = None
 
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "service": "billing-service"}
+class BillingResponse(BaseModel):
+    billing_id: str
+    booking_id: str
+    amount: float
+    payment_method: str
+    payment_status: str
+    transaction_date: datetime
 
 
+class BillingListResponse(BaseModel):
+    total_count: int
+    total_amount: float
+    billings: List[BillingResponse]
+
+
+class RefundRequest(BaseModel):
+    reason: str
+
+
+# ==========================================================
+# --------------------- ROUTES ------------------------------
+# ==========================================================
+
+
+# --------------------- 1. Create Payment -------------------
 @app.post("/payments", response_model=BillingResponse)
-async def process_payment(
-    payment: PaymentRequest,
-    db: Session = Depends(get_mysql_session)
-):
-    """Process a payment for a booking."""
-    from .service import BillingService
-    service = BillingService(db)
-    
-    try:
-        billing = service.process_payment(payment)
-        return billing
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+def create_payment(req: PaymentRequest):
+    """
+    Creates a billing entry when a user pays for a booking.
+    Frontend: PaymentForm.jsx → createPayment()
+    """
+    if req.payment_method not in ["credit_card", "paypal"]:
+        raise HTTPException(status_code=400, detail="Invalid payment method")
 
-
-@app.get("/billings/{billing_id}", response_model=BillingResponse)
-async def get_billing(billing_id: str, db: Session = Depends(get_mysql_session)):
-    """Get billing record by ID."""
-    from .service import BillingService
-    billing = BillingService(db).get_billing(billing_id)
-    if not billing:
-        handle_not_found("Billing", billing_id)
-    return billing
-
-
-@app.get("/billings", response_model=BillingListResponse)
-async def search_billings(
-    user_id: Optional[str] = None,
-    booking_type: Optional[str] = None,
-    payment_status: Optional[str] = None,
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_mysql_session)
-):
-    """Search billing records."""
-    from .service import BillingService
-    
-    params = BillingSearchParams(
-        user_id=user_id, booking_type=booking_type,
-        payment_status=payment_status,
-        start_date=start_date, end_date=end_date,
-        page=page, page_size=page_size
+    billing = db.create_billing_entry(
+        booking_id=req.booking_id,
+        payment_method=req.payment_method,
+        amount=db.get_booking_amount(req.booking_id),
+        card_number=req.card_number,
+        card_expiry=req.card_expiry,
+        card_cvv=req.card_cvv,
+        paypal_email=req.paypal_email,
     )
-    return BillingService(db).search_billings(params)
+
+    return BillingResponse(**billing)
 
 
-@app.post("/billings/{billing_id}/refund")
-async def process_refund(
-    billing_id: str,
-    refund: RefundRequest,
-    db: Session = Depends(get_mysql_session)
+# --------------------- 2. Get Billing by ID ----------------
+@app.get("/billings/{billing_id}", response_model=BillingResponse)
+def get_billing_by_id(billing_id: str):
+    """
+    Retrieve a single billing record.
+    Used by: PaymentConfirmation, InvoiceViewer
+    """
+    billing = db.get_billing(billing_id)
+    if not billing:
+        raise HTTPException(status_code=404, detail="Billing record not found")
+
+    return BillingResponse(**billing)
+
+
+# --------------------- 3. List/Search Billings -------------
+@app.get("/billings", response_model=BillingListResponse)
+def search_billings(
+    user_id: Optional[str] = Query(None),
+    booking_id: Optional[str] = Query(None),
+    limit: int = 100,
 ):
-    """Process a refund."""
-    from .service import BillingService
-    return BillingService(db).process_refund(billing_id, refund)
+    """
+    Returns all billing records or filters by user/booking.
+    Used by: BillingHistory component
+    """
+    result = db.search_billings(user_id=user_id, booking_id=booking_id, limit=limit)
+    return BillingListResponse(**result)
 
 
+# --------------------- 4. Refund Billing -------------------
+@app.post("/billings/{billing_id}/refund")
+def refund_billing(billing_id: str, req: RefundRequest):
+    """
+    Marks a billing entry as refunded.
+    """
+    success = db.refund_billing(billing_id, req.reason)
+    if not success:
+        raise HTTPException(status_code=400, detail="Refund failed")
+
+    return {"status": "REFUNDED", "billing_id": billing_id}
+
+
+# --------------------- 5. Generate Invoice -----------------
 @app.get("/billings/{billing_id}/invoice")
-async def get_invoice(billing_id: str, db: Session = Depends(get_mysql_session)):
-    """Get invoice details."""
-    from .service import BillingService
-    return BillingService(db).generate_invoice(billing_id)
+def generate_invoice(billing_id: str):
+    """
+    Returns invoice data (not a PDF).
+    Used by: InvoiceViewer.jsx
+    """
+    invoice = db.generate_invoice(billing_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    return invoice
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8005)
-
+# --------------------- 6. Health Check ---------------------
+@app.get("/health")
+def health():
+    return {"status": "billing service OK"}
