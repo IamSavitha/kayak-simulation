@@ -37,10 +37,6 @@ app.add_middleware(
 )
 
 
-# -------------------------------------------------------------------
-# Legacy request models to match the original Billing API PDF
-# -------------------------------------------------------------------
-
 
 class LegacyPaymentDetails(BaseModel):
     cardNumber: Optional[str] = None
@@ -51,13 +47,13 @@ class LegacyPaymentDetails(BaseModel):
 
 
 class LegacyPaymentInfo(BaseModel):
-    method: str  # "CREDIT_CARD" | "PAYPAL"
+    method: str 
     details: LegacyPaymentDetails
 
 
 class LegacyBillingCreateRequest(BaseModel):
     userId: str
-    bookingType: str  # "HOTEL" | "FLIGHT" | "CAR"
+    bookingType: str  
     bookingId: str
     totalAmount: float
     currency: str
@@ -65,7 +61,7 @@ class LegacyBillingCreateRequest(BaseModel):
 
 
 class AdminStatusUpdateRequest(BaseModel):
-    status: str  # pending | completed | failed | refunded
+    status: str  
 
 
 def require_admin(x_admin: Optional[str] = Header(default=None)):
@@ -77,9 +73,6 @@ def require_admin(x_admin: Optional[str] = Header(default=None)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
 
-# -------------------------------------------------------------------
-# Startup & health
-# -------------------------------------------------------------------
 
 
 @app.on_event("startup")
@@ -92,10 +85,6 @@ async def startup_event():
 async def health_check():
     return {"status": "healthy", "service": "billing-service"}
 
-
-# -------------------------------------------------------------------
-# Core (new) billing endpoints used by kayak-simulation
-# -------------------------------------------------------------------
 
 
 @app.post("/payments", response_model=BillingResponse)
@@ -161,9 +150,6 @@ async def get_invoice(billing_id: str, db: Session = Depends(get_mysql_session))
     return BillingService(db).generate_invoice(billing_id)
 
 
-# -------------------------------------------------------------------
-# Legacy public endpoints to match Billing API PDF
-# -------------------------------------------------------------------
 
 
 @app.post("/billing", response_model=BillingResponse, tags=["legacy-billing"])
@@ -268,10 +254,6 @@ async def get_invoice_legacy(
         raise HTTPException(status_code=404, detail="Invoice not found")
     return invoice
 
-
-# -------------------------------------------------------------------
-# Admin endpoints to match Billing API PDF (/admin/billing/*)
-# -------------------------------------------------------------------
 
 
 @app.get(
@@ -431,7 +413,6 @@ async def admin_revenue_summary(
     )
     result = BillingService(db).search_billings(params)
 
-    # BillingListResponse.total_amount is a Decimal
     return {
         "year": year,
         "month": month,
