@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
-import { getInvoice } from '../api/billingApi';
+import { getInvoice } from '../../api/billingApi';
 
-export default function InvoiceViewer({ billingId }) {
-  const [invoice, setInvoice] = useState(null);
+interface InvoiceViewerProps {
+  billingId: string | null;
+}
+
+export default function InvoiceViewer({ billingId }: InvoiceViewerProps) {
+  const [invoice, setInvoice] = useState<any | null>(null);
 
   useEffect(() => {
     if (!billingId) return;
+    setInvoice(null);
     getInvoice(billingId).then(setInvoice);
   }, [billingId]);
 
@@ -21,7 +26,8 @@ export default function InvoiceViewer({ billingId }) {
     );
   }
 
-  const { payload } = invoice;
+  // FastAPI billing service returns the invoice payload directly (no { payload: ... } wrapper)
+  const payload = invoice;
 
   return (
     <div className="invoice-viewer mt-6">
@@ -29,7 +35,7 @@ export default function InvoiceViewer({ billingId }) {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">
-              Invoice #{payload.invoiceNumber}
+              Invoice #{payload.invoice_number || payload.invoiceNumber || billingId}
             </h2>
             <p className="text-sm text-slate-500">
               Detailed invoice data for this billing record.

@@ -481,4 +481,3 @@ volumes:
 networks:
   kayak_network:
     driver: bridge
-

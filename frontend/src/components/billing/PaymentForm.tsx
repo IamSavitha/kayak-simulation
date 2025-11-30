@@ -1,9 +1,22 @@
-import { useState } from 'react';
-import { createBilling } from '../api/billingApi';
+import { FormEvent, useState } from 'react';
+import { createPayment } from '../../api/billingApi';
 
-export default function PaymentForm({ booking, onPaymentComplete }) {
-  const [method, setMethod] = useState('CREDIT_CARD');
+interface Booking {
+  id: string | number;
+  type: string;
+  userId: string;
+  totalPrice: number;
+}
+
+interface PaymentFormProps {
+  booking: Booking;
+  onPaymentComplete: (result: any) => void;
+}
+
+export default function PaymentForm({ booking, onPaymentComplete }: PaymentFormProps) {
+  const [method, setMethod] = useState<'CREDIT_CARD' | 'PAYPAL'>('CREDIT_CARD');
   const [cardNumber, setCardNumber] = useState('');
+  const [cardholderName, setCardholderName] = useState('');
   const [cvv, setCvv] = useState('');
   const [expiryMonth, setExpiryMonth] = useState('');
   const [expiryYear, setExpiryYear] = useState('');
@@ -11,32 +24,60 @@ export default function PaymentForm({ booking, onPaymentComplete }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      const payment = {
-        method,
-        details:
-          method === 'CREDIT_CARD'
-            ? { cardNumber, cvv, expiryMonth, expiryYear }
-            : { paypalEmail }
+      const paymentMethod = method === 'CREDIT_CARD' ? 'credit_card' : 'paypal';
+
+      const payload: any = {
+        booking_id: String(booking.id),
+        payment_method: paymentMethod,
       };
 
-      const result = await createBilling({
-        userId: booking.userId,
-        bookingType: booking.type,
-        bookingId: booking.id,
-        totalAmount: booking.totalPrice,
-        currency: 'USD',
-        payment
-      });
+      if (paymentMethod === 'credit_card') {
+        // Card expiry must be in MM/YY format according to PaymentRequest validator
+        const month = expiryMonth.trim();
+        const yearTwoDigits = expiryYear.trim().slice(-2); // '2030' -> '30'
 
+        payload.card_number = cardNumber.replace(/\s+/g, '');
+        payload.card_expiry = `${month}/${yearTwoDigits}`;
+        payload.card_cvv = cvv;
+        if (cardholderName.trim()) {
+          payload.cardholder_name = cardholderName.trim();
+        }
+      } else {
+        payload.paypal_email = paypalEmail;
+      }
+
+      const result = await createPayment(payload);
       onPaymentComplete(result);
-    } catch (err) {
-      const msg = err.response?.data?.error || 'Payment failed';
+    } catch (err: any) {
+      let msg = 'Payment failed';
+      const data = err?.response?.data;
+
+      if (data) {
+        if (typeof data === 'string') {
+          msg = data;
+        } else if (data.detail) {
+          const detail = data.detail;
+          if (Array.isArray(detail) && detail.length > 0) {
+            // FastAPI / Pydantic validation errors
+            msg = detail
+              .map((d: any) => d.msg || JSON.stringify(d))
+              .join('; ');
+          } else if (typeof detail === 'string') {
+            msg = detail;
+          } else {
+            msg = JSON.stringify(detail);
+          }
+        } else if (data.error || data.message) {
+          msg = data.error || data.message;
+        }
+      }
+
       setError(msg);
     } finally {
       setLoading(false);
@@ -44,10 +85,7 @@ export default function PaymentForm({ booking, onPaymentComplete }) {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="payment-form mt-6"
-    >
+    <form onSubmit={handleSubmit} className="payment-form mt-6">
       <div className="card p-6 md:p-8 max-w-2xl">
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-slate-900">Payment</h2>
@@ -104,9 +142,22 @@ export default function PaymentForm({ booking, onPaymentComplete }) {
                 <input
                   value={cardNumber}
                   onChange={(e) => setCardNumber(e.target.value)}
-                  required
+                  required={method === 'CREDIT_CARD'}
                   className="input-field"
-                  placeholder="1234 5678 9012 3456"
+                  placeholder="4111 1111 1111 1111"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Cardholder Name
+                </label>
+                <input
+                  value={cardholderName}
+                  onChange={(e) => setCardholderName(e.target.value)}
+                  required={method === 'CREDIT_CARD'}
+                  className="input-field"
+                  placeholder="John Doe"
                 />
               </div>
 
@@ -117,7 +168,7 @@ export default function PaymentForm({ booking, onPaymentComplete }) {
                 <input
                   value={expiryMonth}
                   onChange={(e) => setExpiryMonth(e.target.value)}
-                  required
+                  required={method === 'CREDIT_CARD'}
                   className="input-field"
                   placeholder="MM"
                 />
@@ -130,7 +181,7 @@ export default function PaymentForm({ booking, onPaymentComplete }) {
                 <input
                   value={expiryYear}
                   onChange={(e) => setExpiryYear(e.target.value)}
-                  required
+                  required={method === 'CREDIT_CARD'}
                   className="input-field"
                   placeholder="YYYY"
                 />
@@ -143,7 +194,7 @@ export default function PaymentForm({ booking, onPaymentComplete }) {
                 <input
                   value={cvv}
                   onChange={(e) => setCvv(e.target.value)}
-                  required
+                  required={method === 'CREDIT_CARD'}
                   className="input-field"
                   placeholder="123"
                 />
@@ -161,9 +212,9 @@ export default function PaymentForm({ booking, onPaymentComplete }) {
                 type="email"
                 value={paypalEmail}
                 onChange={(e) => setPaypalEmail(e.target.value)}
-                required
+                required={method === 'PAYPAL'}
                 className="input-field"
-                placeholder="you@example.com"
+                placeholder="test.paypal@example.com"
               />
             </div>
           )}
