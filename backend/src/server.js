@@ -3,14 +3,13 @@ require('dotenv').config();
 const app = require('./app');
 const connectMongo = require('./config/db.mongo');
 const { startBookingConsumer } = require('./services/booking.consumer');
-// NEW: payment consumer
-const { startPaymentConsumer } = require('./services/payment.consumer');
+// CHANGED: path now points into backend/kafka
+const { startPaymentConsumer } = require('../kafka/paymentConsumer');
 
 async function start() {
   await connectMongo();
   await startBookingConsumer();
-  // NEW: start Kafka payment consumer
-  await startPaymentConsumer();
+  await startPaymentConsumer(); // start payment Kafka consumer
 
   const port = process.env.PORT || 8005;
   app.listen(port, () => console.log(`Billing service on :${port}`));

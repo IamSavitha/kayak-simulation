@@ -3,8 +3,8 @@ const express = require('express');
 const billingRepo = require('../repositories/billing.repo');
 const invoiceService = require('../services/invoice.service');
 const { createBillingFromBooking, getBillingWithCache } = require('../services/billing.service');
-// NEW: Kafka payment producer
-const { sendPaymentRequest } = require('../services/payment.producer');
+// CHANGED: path now points into backend/kafka
+const { sendPaymentRequest } = require('../../kafka/paymentProducer');
 
 const router = express.Router();
 
@@ -32,8 +32,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// NEW: async payment endpoint that pushes a payment request into Kafka
-// Path: POST /billing/payment
+// NEW async payment endpoint -> pushes to Kafka
 router.post('/payment', async (req, res) => {
   try {
     const { userId, bookingType, bookingId, totalAmount, currency, payment } = req.body;
@@ -50,7 +49,6 @@ router.post('/payment', async (req, res) => {
 
     await sendPaymentRequest(payload);
 
-    // We don't return the final billing here; that will be produced by the Kafka consumer.
     return res.status(202).json({
       status: 'PENDING',
       message: 'Payment request accepted and will be processed asynchronously.'
@@ -61,10 +59,7 @@ router.post('/payment', async (req, res) => {
   }
 });
 
-// NOTE: these routes are left exactly as you had them.
-// Be aware that Express matches routes in order: '/:billingId' will
-// catch anything like '/user/123' unless '/user/:userId' is placed first.
-
+// Existing routes (kept as-is)
 router.get('/:billingId', async (req, res) => {
   const billing = await getBillingWithCache(req.params.billingId);
   if (!billing) return res.status(404).json({ error: 'Not found' });

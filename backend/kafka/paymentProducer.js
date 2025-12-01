@@ -1,8 +1,8 @@
-// backend/src/services/payment.producer.js
+// backend/kafka/paymentProducer.js
 require('dotenv').config();
 const { Kafka } = require('kafkajs');
 
-// KAFKA_BROKERS in .env is a comma-separated list like "kafka:9092"
+// KAFKA_BROKERS env is a comma-separated list, e.g. "kafka:9092"
 const brokers = (process.env.KAFKA_BROKERS || 'kafka:9092')
   .split(',')
   .map((b) => b.trim())
@@ -22,7 +22,7 @@ async function getProducer() {
   if (!producer) {
     producer = kafka.producer();
     await producer.connect();
-    console.log('[payment.producer] Kafka producer connected');
+    console.log('[paymentProducer] Kafka producer connected');
   }
   return producer;
 }
@@ -46,7 +46,7 @@ async function sendPaymentRequest(payload) {
   });
 
   console.log(
-    '[payment.producer] Sent payment request for booking',
+    '[paymentProducer] Sent payment request for booking',
     payload.bookingEvent?.bookingId
   );
 }
