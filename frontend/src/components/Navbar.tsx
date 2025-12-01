@@ -47,6 +47,9 @@ const Navbar: React.FC = () => {
             <NavLink to="/cars" icon={<Car size={16} />} active={isActive('/cars')}>
               Cars
             </NavLink>
+            <NavLink to="/billing" icon={<Car size={16} />} active={isActive('/billing')}>
+              Billing
+            </NavLink>
           </div>
           
           {/* Desktop User Menu - Right Aligned */}

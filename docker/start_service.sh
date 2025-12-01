@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Startup script for backend services
 # Uses SERVICE_NAME environment variable to determine which service to start
 

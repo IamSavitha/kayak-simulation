@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Kayak Travel Simulation Frontend",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -37,4 +38,3 @@
     "eslint-plugin-react": "^7.33.2"
   }
 }
-

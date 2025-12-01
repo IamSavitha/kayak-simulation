@@ -10,6 +10,7 @@ import BookingsPage from './pages/BookingsPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
+import BillingPage from './pages/billing/BillingPage';
 
 // Components
 import Navbar from './components/Navbar';
@@ -38,6 +39,7 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/billing" element={<BillingPage />} />
             </Routes>
           </main>
           <Footer />
