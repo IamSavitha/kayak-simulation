@@ -19,6 +19,7 @@ export interface HotelCreateData {
   phone_number?: string;
   email?: string;
   website?: string;
+  image_url?: string;
 }
 
 export interface HotelUpdateData {
@@ -33,6 +34,7 @@ export interface HotelUpdateData {
   phone_number?: string;
   email?: string;
   website?: string;
+  image_url?: string;
   is_active?: boolean;
 }
 
@@ -80,6 +82,7 @@ export interface HotelResponse {
   phone_number?: string;
   email?: string;
   website?: string;
+  image_url?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -94,22 +97,31 @@ function getAdminToken(): string | null {
 }
 
 /**
- * Create a new hotel
+ * Create a new hotel with optional image upload
  */
-export async function createHotel(data: HotelCreateData): Promise<HotelResponse> {
+export async function createHotel(
+  data: HotelCreateData,
+  imageFile?: File
+): Promise<HotelResponse> {
   const token = getAdminToken();
   if (!token) {
     throw new Error('Admin authentication required');
   }
 
   try {
+    const formData = new FormData();
+    formData.append('hotel_data', JSON.stringify(data));
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+
     const response = await fetch(`${ADMIN_API_BASE_URL}/hotels`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        // Don't set Content-Type header - browser will set it with boundary for FormData
       },
-      body: JSON.stringify(data),
+      body: formData,
     });
 
     if (!response.ok) {
@@ -127,11 +139,12 @@ export async function createHotel(data: HotelCreateData): Promise<HotelResponse>
 }
 
 /**
- * Update a hotel
+ * Update a hotel with optional image upload
  */
 export async function updateHotel(
   hotelId: string,
-  data: HotelUpdateData
+  data: HotelUpdateData,
+  imageFile?: File
 ): Promise<HotelResponse> {
   const token = getAdminToken();
   if (!token) {
@@ -139,13 +152,19 @@ export async function updateHotel(
   }
 
   try {
+    const formData = new FormData();
+    formData.append('hotel_data', JSON.stringify(data));
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+
     const response = await fetch(`${ADMIN_API_BASE_URL}/hotels/${hotelId}`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        // Don't set Content-Type header - browser will set it with boundary for FormData
       },
-      body: JSON.stringify(data),
+      body: formData,
     });
 
     if (!response.ok) {

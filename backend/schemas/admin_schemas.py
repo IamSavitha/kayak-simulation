@@ -21,6 +21,7 @@ class AdminCreate(BaseModel):
     city: Optional[str] = Field(None, max_length=100)
     state: Optional[str] = Field(None, max_length=2)
     zip_code: Optional[str] = Field(None, max_length=10)
+    profile_image_url: Optional[str] = Field(None, max_length=500, description="URL to admin profile image")
     role: AdminRole = Field(default=AdminRole.ADMIN)
     
     @field_validator('admin_id')
@@ -58,6 +59,7 @@ class AdminUpdate(BaseModel):
     city: Optional[str] = Field(None, max_length=100)
     state: Optional[str] = Field(None, max_length=2)
     zip_code: Optional[str] = Field(None, max_length=10)
+    profile_image_url: Optional[str] = Field(None, max_length=500)
     role: Optional[AdminRole] = None
     is_active: Optional[bool] = None
 
@@ -87,6 +89,7 @@ class AdminResponse(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     zip_code: Optional[str] = None
+    profile_image_url: Optional[str] = None
     role: AdminRole
     is_active: bool
     created_at: datetime

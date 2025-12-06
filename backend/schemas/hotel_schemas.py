@@ -28,6 +28,7 @@ class HotelBase(BaseModel):
     phone_number: Optional[str] = Field(None, max_length=20)
     email: Optional[str] = Field(None, max_length=255)
     website: Optional[str] = Field(None, max_length=255)
+    image_url: Optional[str] = Field(None, max_length=500, description="URL to hotel image")
 
 
 class HotelCreate(HotelBase):
@@ -65,6 +66,7 @@ class HotelUpdate(BaseModel):
     phone_number: Optional[str] = Field(None, max_length=20)
     email: Optional[str] = Field(None, max_length=255)
     website: Optional[str] = Field(None, max_length=255)
+    image_url: Optional[str] = Field(None, max_length=500)
     is_active: Optional[bool] = None
 
 
@@ -123,6 +125,7 @@ class HotelResponse(BaseModel):
     phone_number: Optional[str] = None
     email: Optional[str] = None
     website: Optional[str] = None
+    image_url: Optional[str] = None
     is_active: bool = True
     created_at: datetime
     updated_at: datetime

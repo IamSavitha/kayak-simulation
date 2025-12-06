@@ -1,10 +1,12 @@
 """
 User Service - FastAPI application for user management.
 """
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pathlib import Path
 import logging
 
 from ...common.config import settings
@@ -42,6 +44,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for image serving
+static_dir = Path("static")
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 @app.exception_handler(InvalidUserIdException)
@@ -104,18 +111,34 @@ async def health_check():
 
 @app.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
-    user_data: UserCreate,
+    user_data: str = Form(...),  # JSON string
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_mysql_session)
 ):
-    """Create a new user."""
+    """Create a new user with optional profile image upload."""
+    import json
+    from ...services.admin_service.image_upload import save_uploaded_image
+    
     try:
+        # Parse JSON data
+        data = json.loads(user_data)
+        
+        # Handle image upload
+        image_url = None
+        if image and image.filename:
+            image_url = await save_uploaded_image(image, "user", data.get("user_id", ""))
+            data["profile_image_url"] = image_url
+        
+        user_create = UserCreate(**data)
         service = UserService(db)
-        user = service.create_user(user_data)
+        user = service.create_user(user_create)
         return user
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON: {str(e)}")
     except DuplicateUserException:
-        handle_duplicate_user(user_data.user_id)
+        handle_duplicate_user(data.get("user_id", ""))
     except InvalidUserIdException:
-        handle_invalid_user_id(user_data.user_id)
+        handle_invalid_user_id(data.get("user_id", ""))
 
 
 @app.get("/users/{user_id}", response_model=UserResponse)

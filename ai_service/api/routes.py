@@ -54,46 +54,62 @@ async def get_deals(
     """Get current deals from the deals agent cache."""
     from ..main import deals_agent
     import asyncio
+    import logging
     
-    if not deals_agent:
-        # If deals agent not initialized, return empty
-        return []
+    logger = logging.getLogger(__name__)
     
-    # If cache is empty, trigger a scan
-    cached_deals = deals_agent.get_cached_deals(listing_type=listing_type)
-    if not cached_deals:
-        # Trigger a background scan
-        asyncio.create_task(deals_agent.scan_for_deals())
-        # Wait a bit for scan to complete (or return empty if scan takes too long)
-        await asyncio.sleep(2)
-        cached_deals = deals_agent.get_cached_deals(listing_type=listing_type)
-    
-    # Filter by minimum score
-    filtered_deals = [
-        d for d in cached_deals 
-        if d.get("deal_score", 0) >= min_score
-    ]
-    
-    # Format response
-    formatted_deals = []
-    for deal in filtered_deals[:limit]:
-        current_price = deal.get("current_price", 0)
-        avg_price = deal.get("avg_30d_price", current_price)
-        discount_pct = 0.0
-        if avg_price > 0 and current_price > 0:
-            discount_pct = ((avg_price - current_price) / avg_price) * 100
+    try:
+        if not deals_agent:
+            logger.warning("Deals agent not initialized, returning empty list")
+            return []
         
-        formatted_deals.append({
-            "listing_id": deal.get("listing_id", ""),
-            "listing_type": deal.get("listing_type", ""),
-            "current_price": round(current_price, 2),
-            "avg_price": round(avg_price, 2),
-            "discount_pct": round(discount_pct, 1),
-            "deal_score": deal.get("deal_score", 0.0),
-            "tags": deal.get("tags", [])
-        })
-    
-    return formatted_deals
+        # If cache is empty, trigger a scan
+        cached_deals = deals_agent.get_cached_deals(listing_type=listing_type)
+        if not cached_deals:
+            # Trigger a background scan
+            try:
+                asyncio.create_task(deals_agent.scan_for_deals())
+                # Wait a bit for scan to complete (or return empty if scan takes too long)
+                await asyncio.sleep(2)
+                cached_deals = deals_agent.get_cached_deals(listing_type=listing_type)
+            except Exception as scan_error:
+                logger.error(f"Error during deal scan: {scan_error}")
+                # Continue with empty cache if scan fails
+        
+        # Filter by minimum score
+        filtered_deals = [
+            d for d in cached_deals 
+            if d.get("deal_score", 0) >= min_score
+        ]
+        
+        # Format response
+        formatted_deals = []
+        for deal in filtered_deals[:limit]:
+            try:
+                current_price = float(deal.get("current_price", 0))
+                avg_price = float(deal.get("avg_30d_price", current_price))
+                discount_pct = 0.0
+                if avg_price > 0 and current_price > 0:
+                    discount_pct = ((avg_price - current_price) / avg_price) * 100
+                
+                formatted_deals.append({
+                    "listing_id": str(deal.get("listing_id", "")),
+                    "listing_type": str(deal.get("listing_type", "")),
+                    "current_price": round(current_price, 2),
+                    "avg_price": round(avg_price, 2),
+                    "discount_pct": round(discount_pct, 1),
+                    "deal_score": round(float(deal.get("deal_score", 0.0)), 1),
+                    "tags": deal.get("tags", []) if isinstance(deal.get("tags"), list) else []
+                })
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error formatting deal {deal.get('listing_id', 'unknown')}: {e}")
+                continue
+        
+        return formatted_deals
+    except Exception as e:
+        logger.error(f"Error getting deals: {e}", exc_info=True)
+        # Return empty list on error instead of raising exception
+        return []
 
 
 @router.post("/bundles", response_model=BundleResponse)

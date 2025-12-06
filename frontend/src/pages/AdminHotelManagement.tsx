@@ -58,6 +58,10 @@ const AdminHotelManagement: React.FC = () => {
   });
   const [editData, setEditData] = useState<HotelUpdateData>({});
   const [submitting, setSubmitting] = useState(false);
+  const [createImageFile, setCreateImageFile] = useState<File | null>(null);
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [createImagePreview, setCreateImagePreview] = useState<string | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
 
   // Check admin authentication
   useEffect(() => {
@@ -103,9 +107,11 @@ const AdminHotelManagement: React.FC = () => {
     setError('');
 
     try {
-      await createHotel(formData);
+      await createHotel(formData, createImageFile || undefined);
       setShowCreateModal(false);
       resetForm();
+      setCreateImageFile(null);
+      setCreateImagePreview(null);
       await loadHotels();
     } catch (err: any) {
       setError(err.message || 'Failed to create hotel');
@@ -130,6 +136,8 @@ const AdminHotelManagement: React.FC = () => {
       website: hotel.website,
       is_active: hotel.is_active
     });
+    setEditImagePreview(hotel.image_url || null);
+    setEditImageFile(null);
     setShowEditModal(true);
   };
 
@@ -141,9 +149,11 @@ const AdminHotelManagement: React.FC = () => {
     setError('');
 
     try {
-      await updateHotel(selectedHotel.hotel_id, editData);
+      await updateHotel(selectedHotel.hotel_id, editData, editImageFile || undefined);
       setShowEditModal(false);
       setSelectedHotel(null);
+      setEditImageFile(null);
+      setEditImagePreview(null);
       await loadHotels();
     } catch (err: any) {
       setError(err.message || 'Failed to update hotel');

@@ -35,6 +35,7 @@ class CarBase(BaseModel):
     pickup_location: str = Field(..., max_length=255)
     city: Optional[str] = Field(None, max_length=100)
     state: Optional[str] = Field(None, max_length=2)
+    image_url: Optional[str] = Field(None, max_length=500, description="URL to car image")
 
 
 class CarCreate(CarBase):
@@ -75,6 +76,7 @@ class CarUpdate(BaseModel):
     pickup_location: Optional[str] = Field(None, max_length=255)
     city: Optional[str] = Field(None, max_length=100)
     state: Optional[str] = Field(None, max_length=2)
+    image_url: Optional[str] = Field(None, max_length=500)
     is_available: Optional[bool] = None
     is_active: Optional[bool] = None
 
@@ -94,6 +96,7 @@ class CarResponse(BaseModel):
     pickup_location: str
     city: Optional[str] = None
     state: Optional[str] = None
+    image_url: Optional[str] = None
     rating: float = 0.0
     total_reviews: int = 0
     is_available: bool = True

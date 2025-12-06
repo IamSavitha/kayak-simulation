@@ -201,6 +201,9 @@ class Hotel(Base):
     email = Column(String(255))
     website = Column(String(255))
     
+    # Image
+    image_url = Column(String(500), nullable=True)
+    
     # Status
     is_active = Column(Boolean, default=True)
     
@@ -284,6 +287,9 @@ class Car(Base):
     # Rating
     rating = Column(Float, default=0.0)
     total_reviews = Column(Integer, default=0)
+    
+    # Image
+    image_url = Column(String(500), nullable=True)
     
     # Availability
     is_available = Column(Boolean, default=True)
@@ -415,6 +421,9 @@ class Admin(Base):
     city = Column(String(100))
     state = Column(String(2))
     zip_code = Column(String(10))
+    
+    # Profile
+    profile_image_url = Column(String(500))
     
     # Access
     role = Column(String(20), default="admin")  # Changed from Enum to String to avoid case-sensitivity issues

@@ -20,6 +20,7 @@ export interface CarCreateData {
   pickup_location: string;
   city?: string;
   state?: string;
+  image_url?: string;
 }
 
 export interface CarUpdateData {
@@ -35,6 +36,7 @@ export interface CarUpdateData {
   pickup_location?: string;
   city?: string;
   state?: string;
+  image_url?: string;
   is_available?: boolean;
   is_active?: boolean;
 }
@@ -53,6 +55,7 @@ export interface CarResponse {
   pickup_location: string;
   city?: string;
   state?: string;
+  image_url?: string;
   is_available: boolean;
   is_active: boolean;
   rating: number;
@@ -65,14 +68,23 @@ function getAdminToken(): string | null {
   return localStorage.getItem('admin_token') || localStorage.getItem('token');
 }
 
-export async function createCar(data: CarCreateData): Promise<{ message: string; car: CarResponse }> {
+export async function createCar(
+  data: CarCreateData,
+  imageFile?: File
+): Promise<{ message: string; car: CarResponse }> {
   const token = getAdminToken();
   if (!token) throw new Error('Admin authentication required');
 
+  const formData = new FormData();
+  formData.append('car_data', JSON.stringify(data));
+  if (imageFile) {
+    formData.append('image', imageFile);
+  }
+
   const response = await fetch(`${ADMIN_API_BASE_URL}/cars`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify(data),
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
   });
 
   if (!response.ok) {
@@ -82,14 +94,24 @@ export async function createCar(data: CarCreateData): Promise<{ message: string;
   return await response.json();
 }
 
-export async function updateCar(carId: string, data: CarUpdateData): Promise<{ message: string; car: CarResponse }> {
+export async function updateCar(
+  carId: string,
+  data: CarUpdateData,
+  imageFile?: File
+): Promise<{ message: string; car: CarResponse }> {
   const token = getAdminToken();
   if (!token) throw new Error('Admin authentication required');
 
+  const formData = new FormData();
+  formData.append('car_data', JSON.stringify(data));
+  if (imageFile) {
+    formData.append('image', imageFile);
+  }
+
   const response = await fetch(`${ADMIN_API_BASE_URL}/cars/${carId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify(data),
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
   });
 
   if (!response.ok) {

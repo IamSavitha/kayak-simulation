@@ -39,7 +39,8 @@ class HotelService:
             amenities=hotel_data.amenities,
             phone_number=hotel_data.phone_number,
             email=hotel_data.email,
-            website=hotel_data.website
+            website=hotel_data.website,
+            image_url=hotel_data.image_url
         )
         
         self.db.add(hotel)

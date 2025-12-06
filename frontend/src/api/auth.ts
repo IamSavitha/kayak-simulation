@@ -40,16 +40,20 @@ export interface TokenResponse {
 }
 
 /**
- * Register a new user
+ * Register a new user with optional profile image upload
  */
-export async function signup(data: SignupData): Promise<any> {
+export async function signup(data: SignupData, imageFile?: File): Promise<any> {
   try {
+    const formData = new FormData();
+    formData.append('user_data', JSON.stringify(data));
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+
     const response = await fetch(`${API_BASE_URL}/users`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+      // Don't set Content-Type header - browser will set it with boundary for FormData
+      body: formData,
     });
 
     if (!response.ok) {

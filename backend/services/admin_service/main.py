@@ -1,9 +1,10 @@
 """
 Admin Service - FastAPI application for admin management and analytics.
 """
-from fastapi import FastAPI, Depends, Query, status, HTTPException
+from fastapi import FastAPI, Depends, Query, status, HTTPException, UploadFile, File, Form
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
@@ -24,6 +25,13 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"]
 )
+
+# Mount static files for image serving
+import os
+from pathlib import Path
+static_dir = Path("static")
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 @app.on_event("startup")
@@ -321,16 +329,28 @@ async def get_all_hotels(
 
 @app.post("/hotels")
 async def create_hotel(
-    hotel_data: dict,
+    hotel_data: str = Form(...),  # JSON string
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_mysql_session),
     current_admin: Admin = Depends(get_current_admin)
 ):
-    """Create a new hotel (admin only)."""
+    """Create a new hotel (admin only) with optional image upload."""
+    import json
     from ...services.hotel_service.service import HotelService
     from ...schemas.hotel_schemas import HotelCreate, HotelResponse
+    from .image_upload import save_uploaded_image
 
     try:
-        hotel_create = HotelCreate(**hotel_data)
+        # Parse JSON data
+        data = json.loads(hotel_data)
+        
+        # Handle image upload
+        image_url = None
+        if image and image.filename:
+            image_url = await save_uploaded_image(image, "hotel", data.get("hotel_id", ""))
+            data["image_url"] = image_url
+        
+        hotel_create = HotelCreate(**data)
         service = HotelService(db)
         hotel = service.create_hotel(hotel_create)
 
@@ -338,6 +358,8 @@ async def create_hotel(
             "message": "Hotel created successfully",
             "hotel": HotelResponse.model_validate(hotel)
         }
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON: {str(e)}")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -348,17 +370,34 @@ async def create_hotel(
 @app.put("/hotels/{hotel_id}")
 async def update_hotel(
     hotel_id: str,
-    hotel_data: dict,
+    hotel_data: str = Form(...),  # JSON string
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_mysql_session),
     current_admin: Admin = Depends(get_current_admin)
 ):
-    """Update hotel information (admin only)."""
+    """Update hotel information (admin only) with optional image upload."""
+    import json
     from ...services.hotel_service.service import HotelService
     from ...schemas.hotel_schemas import HotelUpdate, HotelResponse
+    from .image_upload import save_uploaded_image, delete_image
 
     try:
-        hotel_update = HotelUpdate(**hotel_data)
-        service = HotelService(db)
+        # Parse JSON data
+        data = json.loads(hotel_data)
+        
+        # Handle image upload
+        if image and image.filename:
+            # Get old hotel to delete old image
+            service = HotelService(db)
+            old_hotel = service.get_hotel(hotel_id)
+            if old_hotel and old_hotel.image_url:
+                delete_image(old_hotel.image_url)
+            
+            # Save new image
+            image_url = await save_uploaded_image(image, "hotel", hotel_id)
+            data["image_url"] = image_url
+        
+        hotel_update = HotelUpdate(**data)
         hotel = service.update_hotel(hotel_id, hotel_update)
 
         if not hotel:
@@ -368,6 +407,8 @@ async def update_hotel(
             "message": "Hotel updated successfully",
             "hotel": HotelResponse.model_validate(hotel)
         }
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON: {str(e)}")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -558,16 +599,28 @@ async def get_all_cars(
 
 @app.post("/cars")
 async def create_car(
-    car_data: dict,
+    car_data: str = Form(...),  # JSON string
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_mysql_session),
     current_admin: Admin = Depends(get_current_admin)
 ):
-    """Create a new car listing (admin only)."""
+    """Create a new car listing (admin only) with optional image upload."""
+    import json
     from ...services.car_service.service import CarService
     from ...schemas.car_schemas import CarCreate, CarResponse
+    from .image_upload import save_uploaded_image
 
     try:
-        car_create = CarCreate(**car_data)
+        # Parse JSON data
+        data = json.loads(car_data)
+        
+        # Handle image upload
+        image_url = None
+        if image and image.filename:
+            image_url = await save_uploaded_image(image, "car", data.get("car_id", ""))
+            data["image_url"] = image_url
+        
+        car_create = CarCreate(**data)
         service = CarService(db)
         car = service.create_car(car_create)
 
@@ -575,6 +628,8 @@ async def create_car(
             "message": "Car created successfully",
             "car": CarResponse.model_validate(car)
         }
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON: {str(e)}")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -585,17 +640,34 @@ async def create_car(
 @app.put("/cars/{car_id}")
 async def update_car(
     car_id: str,
-    car_data: dict,
+    car_data: str = Form(...),  # JSON string
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_mysql_session),
     current_admin: Admin = Depends(get_current_admin)
 ):
-    """Update car information (admin only)."""
+    """Update car information (admin only) with optional image upload."""
+    import json
     from ...services.car_service.service import CarService
     from ...schemas.car_schemas import CarUpdate, CarResponse
+    from .image_upload import save_uploaded_image, delete_image
 
     try:
-        car_update = CarUpdate(**car_data)
-        service = CarService(db)
+        # Parse JSON data
+        data = json.loads(car_data)
+        
+        # Handle image upload
+        if image and image.filename:
+            # Get old car to delete old image
+            service = CarService(db)
+            old_car = service.get_car(car_id)
+            if old_car and old_car.image_url:
+                delete_image(old_car.image_url)
+            
+            # Save new image
+            image_url = await save_uploaded_image(image, "car", car_id)
+            data["image_url"] = image_url
+        
+        car_update = CarUpdate(**data)
         car = service.update_car(car_id, car_update)
 
         if not car:
@@ -605,6 +677,8 @@ async def update_car(
             "message": "Car updated successfully",
             "car": CarResponse.model_validate(car)
         }
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON: {str(e)}")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
@@ -742,15 +816,27 @@ async def delete_flight(
 
 @app.post("/auth/signup")
 async def admin_signup(
-    admin_data: dict,
+    admin_data: str = Form(...),  # JSON string
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_mysql_session)
 ):
-    """Create a new admin account."""
+    """Create a new admin account with optional profile image upload."""
+    import json
     from .service import AdminService
     from ...schemas.admin_schemas import AdminCreate
+    from .image_upload import save_uploaded_image
     
     try:
-        admin_create = AdminCreate(**admin_data)
+        # Parse JSON data
+        data = json.loads(admin_data)
+        
+        # Handle image upload
+        image_url = None
+        if image and image.filename:
+            image_url = await save_uploaded_image(image, "admin", data.get("admin_id", ""))
+            data["profile_image_url"] = image_url
+        
+        admin_create = AdminCreate(**data)
         service = AdminService(db)
         admin = service.create_admin(admin_create)
         
@@ -759,6 +845,8 @@ async def admin_signup(
             "message": "Admin account created successfully",
             "admin": AdminResponse.model_validate(admin)
         }
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON: {str(e)}")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:

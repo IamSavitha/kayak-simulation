@@ -294,6 +294,7 @@ class AdminService:
             city=admin_data.city,
             state=admin_data.state,
             zip_code=admin_data.zip_code,
+            profile_image_url=admin_data.profile_image_url,
             role=admin_data.role.value if hasattr(admin_data.role, 'value') else str(admin_data.role),
             password_hash=password_hash
         )

@@ -41,16 +41,20 @@ export interface AdminTokenResponse {
 }
 
 /**
- * Register a new admin
+ * Register a new admin with optional profile image upload
  */
-export async function adminSignup(data: AdminSignupData): Promise<any> {
+export async function adminSignup(data: AdminSignupData, imageFile?: File): Promise<any> {
   try {
+    const formData = new FormData();
+    formData.append('admin_data', JSON.stringify(data));
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+
     const response = await fetch(`${ADMIN_API_BASE_URL}/auth/signup`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+      // Don't set Content-Type header - browser will set it with boundary for FormData
+      body: formData,
     });
 
     if (!response.ok) {

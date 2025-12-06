@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Lock, Mail, Phone, MapPin } from 'lucide-react';
+import { User, Lock, Mail, Phone, MapPin, Upload, X } from 'lucide-react';
 import { adminSignup } from '../api/admin';
 
 const AdminSignupPage: React.FC = () => {
@@ -21,6 +21,8 @@ const AdminSignupPage: React.FC = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
@@ -65,7 +67,7 @@ const AdminSignupPage: React.FC = () => {
         state: formData.state || undefined,
         zip_code: formData.zipCode || undefined,
         role: formData.role // Already lowercase: 'admin', 'super_admin', 'moderator'
-      });
+      }, profileImage || undefined);
 
       alert('Admin account created successfully! Please sign in.');
       navigate('/admin/login');
@@ -74,6 +76,32 @@ const AdminSignupPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image file size must be less than 5MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        setError('Please select a valid image file');
+        return;
+      }
+      setProfileImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      setError('');
+    }
+  };
+
+  const removeImage = () => {
+    setProfileImage(null);
+    setImagePreview(null);
   };
 
   return (
@@ -294,6 +322,44 @@ const AdminSignupPage: React.FC = () => {
                   className="block w-full pl-10 pr-3 py-2.5 border-2 border-slate-300 rounded-xl text-slate-900 placeholder-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400"
                 />
               </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-600 mb-1.5">
+                Profile Image (Optional)
+              </label>
+              {imagePreview ? (
+                <div className="relative inline-block">
+                  <img
+                    src={imagePreview}
+                    alt="Profile preview"
+                    className="w-32 h-32 object-cover rounded-lg border-2 border-slate-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-0 right-0 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Upload className="w-8 h-8 mb-2 text-slate-400" />
+                    <p className="mb-2 text-sm text-slate-500">
+                      <span className="font-semibold">Click to upload</span> or drag and drop
+                    </p>
+                    <p className="text-xs text-slate-400">PNG, JPG, GIF up to 5MB</p>
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                  />
+                </label>
+              )}
             </div>
           </div>
 
