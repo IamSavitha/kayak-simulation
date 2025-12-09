@@ -71,3 +71,9 @@ build/
 .vite/
 .vite-ssg/
 
+# JMeter test results (large files)
+*.jtl
+jmeter/results/*.jtl
+jmeter/results/charts/
+jmeter/results/*_report/
+
