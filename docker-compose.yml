@@ -440,6 +440,7 @@ services:
       - "8008:8000"
     volumes:
       - ./ai_service:/app/ai_service
+      - "../data 236 project datasets :/app/datasets"
     networks:
       - kayak_network
 

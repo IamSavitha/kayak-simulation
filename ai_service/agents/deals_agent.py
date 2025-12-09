@@ -10,19 +10,25 @@ from decimal import Decimal
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 import json
 
+# Import our data loader
+import sys
+import os
+ai_service_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ai_service_path)
+
+from data_loader import DatasetLoader
+
 # Import database models and session
 try:
     from backend.common.database import get_mysql_context
-    from backend.models.mysql_models import Flight, Hotel, HotelRoom
+    from backend.models.mysql_models import Flight, Hotel, HotelRoom, Car
 except ImportError:
     # Fallback for local development
-    import sys
-    import os
     backend_path = os.path.join(os.path.dirname(__file__), '../../backend')
     if os.path.exists(backend_path):
         sys.path.insert(0, os.path.abspath(backend_path))
     from backend.common.database import get_mysql_context
-    from backend.models.mysql_models import Flight, Hotel, HotelRoom
+    from backend.models.mysql_models import Flight, Hotel, HotelRoom, Car
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +48,15 @@ class DealsAgent:
         self.consumer: Optional[AIOKafkaConsumer] = None
         self.cached_deals: Dict[str, Any] = {}
         self.price_history: Dict[str, List[float]] = {}
+        
+        # Initialize data loader with existing CSVs
+        self.data_loader = DatasetLoader()
+        logger.info("Initializing Deals Agent with CSV datasets...")
+        try:
+            self.data_loader.load_all_datasets()
+            logger.info("✅ Datasets loaded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to load datasets: {e}")
         
         # Deal detection thresholds
         self.PRICE_DROP_THRESHOLD = 0.15  # 15% below average
@@ -78,14 +93,22 @@ class DealsAgent:
         """Scan all listings for deals."""
         logger.info("Scanning for deals...")
         
-        # Scan flights
+        # Scan flights from database
         flight_deals = await self._scan_flight_deals()
         
-        # Scan hotels
+        # Scan hotels from database
         hotel_deals = await self._scan_hotel_deals()
         
-        # Process and emit deals
-        all_deals = flight_deals + hotel_deals
+        # Scan cars from database
+        car_deals = await self._scan_car_deals()
+        
+        # Get deals from CSV datasets
+        csv_flight_deals = await self._get_csv_flight_deals()
+        csv_hotel_deals = await self._get_csv_hotel_deals()
+        csv_airbnb_deals = await self._get_csv_airbnb_deals()
+        
+        # Combine all deals
+        all_deals = flight_deals + hotel_deals + car_deals + csv_flight_deals + csv_hotel_deals + csv_airbnb_deals
         
         for deal in all_deals:
             # Normalize
@@ -97,10 +120,13 @@ class DealsAgent:
             # Tag
             tagged = self._tag_deal(scored)
             
+            # Cache the deal
+            self.cached_deals[tagged.get('deal_id', '')] = tagged
+            
             # Emit
             await self._emit_deal(tagged)
         
-        logger.info(f"Found {len(all_deals)} potential deals")
+        logger.info(f"Found {len(all_deals)} potential deals (Database: {len(flight_deals + hotel_deals + car_deals)}, CSV: {len(csv_flight_deals + csv_hotel_deals + csv_airbnb_deals)})")
     
     async def _scan_flight_deals(self) -> List[Dict]:
         """Scan flight listings for deals."""
@@ -205,6 +231,46 @@ class DealsAgent:
         
         return deals
     
+    async def _scan_car_deals(self) -> List[Dict]:
+        """Scan car rental listings for deals."""
+        deals = []
+        
+        try:
+            with get_mysql_context() as db:
+                # Query active cars with available quantity
+                cars = db.query(Car).filter(
+                    Car.is_active == True,
+                    Car.available_quantity > 0
+                ).limit(100).all()
+                
+                for car in cars:
+                    current_price = float(car.price_per_day)
+                    # Estimate average price as 1.25x current price (simplified heuristic)
+                    avg_30d_price = current_price * 1.25
+                    
+                    car_deal = {
+                        "listing_id": car.car_id,
+                        "listing_type": "car",
+                        "name": f"{car.make} {car.model}",
+                        "location": car.location,
+                        "current_price": current_price,
+                        "avg_30d_price": avg_30d_price,
+                        "available_quantity": car.available_quantity,
+                        "car_type": car.car_type,
+                        "transmission": car.transmission,
+                        "seats": car.seats,
+                        "fuel_type": car.fuel_type or "unknown",
+                        "rating": float(car.rating) if car.rating else 0.0
+                    }
+                    
+                    # Check if it's a deal
+                    if self._is_deal(car_deal):
+                        deals.append(car_deal)
+        except Exception as e:
+            logger.error(f"Error scanning car deals: {e}")
+        
+        return deals
+    
     def _is_deal(self, listing: Dict) -> bool:
         """Determine if a listing qualifies as a deal."""
         current_price = listing.get("current_price", 0)
@@ -217,7 +283,7 @@ class DealsAgent:
                 return True
         
         # Limited inventory check
-        availability = listing.get("available_seats", listing.get("available_rooms", 100))
+        availability = listing.get("available_seats", listing.get("available_rooms", listing.get("available_quantity", 100)))
         if availability <= self.LIMITED_INVENTORY_THRESHOLD:
             return True
         
@@ -305,6 +371,98 @@ class DealsAgent:
         
         # In production, emit to Kafka
         logger.debug(f"Emitting deal: {deal['listing_id']} - Score: {deal.get('deal_score')}")
+    
+    async def _get_csv_flight_deals(self) -> List[Dict]:
+        """Get flight deals from CSV datasets."""
+        deals = []
+        try:
+            csv_deals = self.data_loader.get_flight_deals(min_discount=15.0, limit=50)
+            
+            for deal_data in csv_deals:
+                deal = {
+                    "listing_id": f"CSV_FL_{deal_data.get('flight', 'UNK')}_{deal_data.get('source_city', '')}",
+                    "listing_type": "flight",
+                    "route": f"{deal_data.get('source_city')}-{deal_data.get('destination_city')}",
+                    "airline": deal_data.get('airline', 'Unknown'),
+                    "current_price": float(deal_data.get('price', 0)),
+                    "avg_30d_price": float(deal_data.get('price_30d_avg', 0)),
+                    "available_seats": 20,  # Default assumption
+                    "departure_date": deal_data.get('departure_date'),
+                    "flight_class": deal_data.get('class', 'Economy'),
+                    "duration_minutes": int(deal_data.get('duration', 0) * 60),
+                    "stops": deal_data.get('stops', 'zero'),
+                    "rating": 4.0,
+                    "source": "csv_dataset"
+                }
+                deals.append(deal)
+                
+        except Exception as e:
+            logger.error(f"Error getting CSV flight deals: {e}")
+        
+        return deals
+    
+    async def _get_csv_hotel_deals(self) -> List[Dict]:
+        """Get hotel deals from CSV datasets."""
+        deals = []
+        try:
+            csv_deals = self.data_loader.get_hotel_deals(min_discount=15.0, limit=50)
+            
+            for deal_data in csv_deals:
+                deal = {
+                    "listing_id": f"CSV_HTL_{deal_data.get('hotel', 'UNK')}_{deal_data.get('country', '')}",
+                    "listing_type": "hotel",
+                    "name": deal_data.get('hotel', 'Hotel'),
+                    "city": deal_data.get('country', 'Unknown'),
+                    "current_price": float(deal_data.get('adr', 0)),
+                    "avg_30d_price": float(deal_data.get('price_30d_avg', 0)),
+                    "available_rooms": 10,  # Default assumption
+                    "amenities": ['WiFi', 'Breakfast'] if deal_data.get('includes_breakfast') else ['WiFi'],
+                    "pet_friendly": False,
+                    "refundable": deal_data.get('deposit_type') == 'No Deposit',
+                    "star_rating": 3,
+                    "rating": 4.0,
+                    "meal_type": deal_data.get('meal', 'BB'),
+                    "source": "csv_dataset"
+                }
+                deals.append(deal)
+                
+        except Exception as e:
+            logger.error(f"Error getting CSV hotel deals: {e}")
+        
+        return deals
+    
+    async def _get_csv_airbnb_deals(self) -> List[Dict]:
+        """Get Airbnb deals from CSV datasets."""
+        deals = []
+        try:
+            csv_deals = self.data_loader.get_airbnb_deals(min_discount=15.0, limit=50)
+            
+            for deal_data in csv_deals:
+                deal = {
+                    "listing_id": f"CSV_AIR_{deal_data.get('id', 'UNK')}",
+                    "listing_type": "airbnb",
+                    "name": deal_data.get('name', 'Airbnb Listing'),
+                    "city": deal_data.get('neighbourhood', 'Unknown'),
+                    "current_price": float(deal_data.get('price', 0)),
+                    "avg_30d_price": float(deal_data.get('price_30d_avg', 0)),
+                    "available_rooms": 1,  # Airbnb listings are typically 1 property
+                    "amenities": [],
+                    "pet_friendly": False,
+                    "refundable": True,
+                    "star_rating": 0,
+                    "rating": float(deal_data.get('number_of_reviews', 0)) / 20,  # Approximate rating
+                    "room_type": deal_data.get('room_type', 'Entire home/apt'),
+                    "host_name": deal_data.get('host_name', 'Host'),
+                    "minimum_nights": int(deal_data.get('minimum_nights', 1)),
+                    "reviews_count": int(deal_data.get('number_of_reviews', 0)),
+                    "source": "csv_dataset"
+                }
+                deals.append(deal)
+                
+        except Exception as e:
+            logger.error(f"Error getting CSV Airbnb deals: {e}")
+        
+        return deals
     
     def get_cached_deals(self, listing_type: Optional[str] = None) -> List[Dict]:
         """Get cached deals, optionally filtered by type."""

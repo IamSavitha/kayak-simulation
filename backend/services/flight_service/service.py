@@ -157,12 +157,64 @@ class FlightService:
         
         query = self.db.query(Flight).filter(Flight.is_active == True)
         
+        # Airport code to city name mapping
+        AIRPORT_TO_CITY = {
+            'SFO': 'San Francisco', 'JFK': 'New York', 'LGA': 'New York', 'EWR': 'New York',
+            'LAX': 'Los Angeles', 'ORD': 'Chicago', 'DFW': 'Dallas', 'SEA': 'Seattle',
+            'BOS': 'Boston', 'MIA': 'Miami', 'ATL': 'Atlanta', 'DEN': 'Denver',
+            'LAS': 'Las Vegas', 'PHX': 'Phoenix', 'IAH': 'Houston', 'CLT': 'Charlotte',
+            'MSP': 'Minneapolis', 'DTW': 'Detroit', 'PHL': 'Philadelphia', 'BWI': 'Baltimore',
+            'SLC': 'Salt Lake City', 'DCA': 'Washington', 'IAD': 'Washington', 'SAN': 'San Diego',
+            'PDX': 'Portland', 'STL': 'St. Louis', 'BNA': 'Nashville', 'AUS': 'Austin',
+            'DEL': 'Delhi', 'BOM': 'Mumbai', 'BLR': 'Bangalore', 'CCU': 'Kolkata',
+            'HYD': 'Hyderabad', 'MAA': 'Chennai'
+        }
+        
+        # City name to airport code mapping (reverse lookup)
+        CITY_TO_AIRPORT = {v: k for k, v in AIRPORT_TO_CITY.items()}
+        
+        # Helper function to normalize airport input (code or city name)
+        def normalize_airport(airport_input: str) -> Optional[str]:
+            if not airport_input:
+                return None
+            airport_input = airport_input.strip().upper()
+            
+            # If it's already a 3-letter code, return it
+            if len(airport_input) == 3 and airport_input.isalpha():
+                return airport_input
+            
+            # Try to find airport code from city name
+            # Check exact match first
+            if airport_input in CITY_TO_AIRPORT:
+                return CITY_TO_AIRPORT[airport_input]
+            
+            # Check case-insensitive match
+            airport_input_lower = airport_input.lower()
+            for city, code in CITY_TO_AIRPORT.items():
+                if city.lower() == airport_input_lower:
+                    return code
+            
+            # Check partial match (e.g., "San Francisco" contains "francisco")
+            for city, code in CITY_TO_AIRPORT.items():
+                if airport_input_lower in city.lower() or city.lower() in airport_input_lower:
+                    return code
+            
+            # If no match found, try using first 3 letters as code
+            if len(airport_input) >= 3:
+                return airport_input[:3]
+            
+            return None
+        
         # Apply filters
         if params.departure_airport:
-            query = query.filter(Flight.departure_airport == params.departure_airport.upper())
+            normalized_dep = normalize_airport(params.departure_airport)
+            if normalized_dep:
+                query = query.filter(Flight.departure_airport == normalized_dep)
         
         if params.arrival_airport:
-            query = query.filter(Flight.arrival_airport == params.arrival_airport.upper())
+            normalized_arr = normalize_airport(params.arrival_airport)
+            if normalized_arr:
+                query = query.filter(Flight.arrival_airport == normalized_arr)
         
         if params.departure_date:
             # Allow flights within a range around the requested date (±30 days for flexibility)

@@ -2,7 +2,7 @@
  * Car API service
  */
 
-const CAR_API_BASE_URL = import.meta.env.VITE_CAR_API_URL || 'http://localhost:8004';
+const CAR_API_BASE_URL = '/api/cars';
 
 export interface Car {
   car_id: string;
@@ -57,7 +57,7 @@ export async function searchCars(params: CarSearchParams): Promise<CarSearchResp
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.page_size) queryParams.append('page_size', params.page_size.toString());
 
-    const response = await fetch(`${CAR_API_BASE_URL}/cars/search?${queryParams.toString()}`);
+    const response = await fetch(`${CAR_API_BASE_URL}/search?${queryParams.toString()}`);
 
     if (!response.ok) {
       const error = await response.json();
@@ -76,7 +76,7 @@ export async function searchCars(params: CarSearchParams): Promise<CarSearchResp
  */
 export async function getCar(carId: string): Promise<Car> {
   try {
-    const response = await fetch(`${CAR_API_BASE_URL}/cars/${carId}`);
+    const response = await fetch(`${CAR_API_BASE_URL}/${carId}`);
 
     if (!response.ok) {
       const error = await response.json();

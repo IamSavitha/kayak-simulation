@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plane, Calendar, MapPin, Users, Search, Filter, ArrowRight, Clock, DollarSign, Star, Loader2 } from 'lucide-react';
 import { searchFlights, Flight as FlightAPI, FlightSearchParams } from '../api/flights';
 import BookingModal from '../components/BookingModal';
@@ -23,6 +24,7 @@ interface Flight {
 }
 
 const FlightsPage: React.FC = () => {
+  const [urlParams] = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [filteredFlights, setFilteredFlights] = useState<Flight[]>([]);
@@ -30,6 +32,7 @@ const FlightsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [highlightedFlightId, setHighlightedFlightId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useState({
     from: '',
     to: '',
@@ -84,14 +87,16 @@ const FlightsPage: React.FC = () => {
     try {
       const params: FlightSearchParams = {
         page: 1,
-        page_size: 100 // Show more flights
+        page_size: 1000 // Show all flights
       };
       
       if (searchParams.from) {
-        params.departure_airport = searchParams.from.toUpperCase();
+        // Backend will handle both codes and city names
+        params.departure_airport = searchParams.from;
       }
       if (searchParams.to) {
-        params.arrival_airport = searchParams.to.toUpperCase();
+        // Backend will handle both codes and city names
+        params.arrival_airport = searchParams.to;
       }
       // Date inputs return YYYY-MM-DD format, which is what the API expects
       if (searchParams.departure) {
@@ -184,6 +189,27 @@ const FlightsPage: React.FC = () => {
     setFilteredFlights(filtered);
   }, [flights, filters]);
 
+  // Handle flight_id from URL (when coming from deals page)
+  useEffect(() => {
+    const flightId = urlParams.get('flight_id');
+    if (flightId && filteredFlights.length > 0) {
+      setHighlightedFlightId(flightId);
+      
+      // Find and scroll to the flight
+      setTimeout(() => {
+        const element = document.getElementById(`flight-${flightId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+      
+      // Clear highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedFlightId(null);
+      }, 3000);
+    }
+  }, [urlParams, filteredFlights]);
+
   const handleSelectFlight = (flight: Flight) => {
     // Store selected flight with travelers info
     const flightWithTravelers = {
@@ -215,12 +241,13 @@ const FlightsPage: React.FC = () => {
                   <MapPin className="text-slate-600 mr-3 flex-shrink-0" size={18} />
                   <input
                     type="text"
-                    placeholder="JFK"
+                    placeholder="SFO or San Francisco"
                     value={searchParams.from}
                     onChange={(e) => setSearchParams({ ...searchParams, from: e.target.value })}
                     className="w-full outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400 bg-transparent"
                   />
                 </div>
+                <p className="text-xs text-slate-500">Enter code (SFO) or city name</p>
               </div>
 
               <div className="space-y-2">
@@ -229,12 +256,13 @@ const FlightsPage: React.FC = () => {
                   <MapPin className="text-slate-600 mr-3 flex-shrink-0" size={18} />
                   <input
                     type="text"
-                    placeholder="LAX"
+                    placeholder="LAX or Los Angeles"
                     value={searchParams.to}
                     onChange={(e) => setSearchParams({ ...searchParams, to: e.target.value })}
                     className="w-full outline-none text-sm font-semibold text-slate-900 placeholder:text-slate-400 bg-transparent"
                   />
                 </div>
+                <p className="text-xs text-slate-500">Enter code (LAX) or city name</p>
               </div>
 
               <div className="space-y-2">
@@ -445,6 +473,7 @@ const FlightsPage: React.FC = () => {
                     flight={flight} 
                     delay={index * 100}
                     onSelect={() => handleSelectFlight(flight)}
+                    isHighlighted={highlightedFlightId === flight.id}
                   />
                 ))}
               </div>
@@ -471,11 +500,13 @@ interface FlightCardProps {
   flight: Flight;
   delay: number;
   onSelect: () => void;
+  isHighlighted?: boolean;
 }
 
-const FlightCard: React.FC<FlightCardProps> = ({ flight, delay, onSelect }) => (
+const FlightCard: React.FC<FlightCardProps> = ({ flight, delay, onSelect, isHighlighted }) => (
   <div
-    className="card-interactive p-6 animate-slide-up"
+    id={`flight-${flight.id}`}
+    className={`card-interactive p-6 animate-slide-up ${isHighlighted ? 'ring-4 ring-blue-500 ring-offset-2' : ''}`}
     style={{ animationDelay: `${delay}ms` }}
   >
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

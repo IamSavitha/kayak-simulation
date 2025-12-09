@@ -19,6 +19,7 @@ import AdminFlightManagement from './pages/AdminFlightManagement';
 import AdminHotelManagement from './pages/AdminHotelManagement';
 import AdminCarManagement from './pages/AdminCarManagement';
 import AdminBookingsManagement from './pages/AdminBookingsManagement';
+import AdminAnalyticsPage from './pages/AdminAnalyticsPage';
 import BillingDetailsPage from './pages/BillingDetailsPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -54,12 +55,14 @@ function App() {
               <Route path="/billing" element={<BillingDetailsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/login" element={<AdminLoginPage />} />
               <Route path="/admin/signup" element={<AdminSignupPage />} />
               <Route path="/admin/flights" element={<AdminFlightManagement />} />
               <Route path="/admin/hotels" element={<AdminHotelManagement />} />
               <Route path="/admin/cars" element={<AdminCarManagement />} />
               <Route path="/admin/bookings" element={<AdminBookingsManagement />} />
+              <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
             </Routes>

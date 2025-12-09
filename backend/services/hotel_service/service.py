@@ -126,6 +126,14 @@ class HotelService:
         for hotel in hotels:
             hotel_dict = HotelResponse.model_validate(hotel).model_dump()
             
+            # Get minimum price from available rooms
+            min_price = self.db.query(func.min(HotelRoom.price_per_night)).filter(
+                HotelRoom.hotel_id == hotel.hotel_id,
+                HotelRoom.is_active == True,
+                HotelRoom.available_rooms > 0
+            ).scalar() or 0
+            hotel_dict['min_price'] = float(min_price)
+            
             # Get total available rooms for this hotel
             total_available_rooms = self.db.query(func.sum(HotelRoom.available_rooms)).filter(
                 HotelRoom.hotel_id == hotel.hotel_id,

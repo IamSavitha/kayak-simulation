@@ -2,7 +2,7 @@
  * Hotel API service
  */
 
-const HOTEL_API_BASE_URL = import.meta.env.VITE_HOTEL_API_URL || 'http://localhost:8003';
+const HOTEL_API_BASE_URL = '/api/hotels';
 
 export interface Hotel {
   hotel_id: string;
@@ -73,7 +73,7 @@ export async function searchHotels(params: HotelSearchParams): Promise<HotelSear
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.page_size) queryParams.append('page_size', params.page_size.toString());
 
-    const response = await fetch(`${HOTEL_API_BASE_URL}/hotels/search?${queryParams.toString()}`);
+    const response = await fetch(`${HOTEL_API_BASE_URL}/search?${queryParams.toString()}`);
 
     if (!response.ok) {
       const error = await response.json();
@@ -92,7 +92,7 @@ export async function searchHotels(params: HotelSearchParams): Promise<HotelSear
  */
 export async function getHotel(hotelId: string): Promise<Hotel> {
   try {
-    const response = await fetch(`${HOTEL_API_BASE_URL}/hotels/${hotelId}`);
+    const response = await fetch(`${HOTEL_API_BASE_URL}/${hotelId}`);
 
     if (!response.ok) {
       const error = await response.json();

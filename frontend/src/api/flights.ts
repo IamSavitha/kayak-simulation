@@ -2,7 +2,7 @@
  * Flight API service
  */
 
-const FLIGHT_API_BASE_URL = import.meta.env.VITE_FLIGHT_API_URL || 'http://localhost:8002';
+const FLIGHT_API_BASE_URL = '/api/flights';
 
 export interface Flight {
   flight_id: string;
@@ -70,7 +70,7 @@ export async function searchFlights(params: FlightSearchParams): Promise<FlightS
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.page_size) queryParams.append('page_size', params.page_size.toString());
 
-    const response = await fetch(`${FLIGHT_API_BASE_URL}/flights/search?${queryParams.toString()}`);
+    const response = await fetch(`${FLIGHT_API_BASE_URL}/search?${queryParams.toString()}`);
 
     if (!response.ok) {
       const error = await response.json();
@@ -117,7 +117,7 @@ export async function searchFlights(params: FlightSearchParams): Promise<FlightS
  */
 export async function getFlight(flightId: string): Promise<Flight> {
   try {
-    const response = await fetch(`${FLIGHT_API_BASE_URL}/flights/${flightId}`);
+    const response = await fetch(`${FLIGHT_API_BASE_URL}/${flightId}`);
 
     if (!response.ok) {
       const error = await response.json();

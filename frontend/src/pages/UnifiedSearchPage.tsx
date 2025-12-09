@@ -45,8 +45,9 @@ const UnifiedSearchPage: React.FC = () => {
 
       if (formData.query) params.query = formData.query;
       if (formData.city) params.city = formData.city;
-      if (formData.departure_airport) params.departure_airport = formData.departure_airport.toUpperCase();
-      if (formData.arrival_airport) params.arrival_airport = formData.arrival_airport.toUpperCase();
+      // Backend will handle both codes and city names
+      if (formData.departure_airport) params.departure_airport = formData.departure_airport;
+      if (formData.arrival_airport) params.arrival_airport = formData.arrival_airport;
       if (formData.check_in) params.check_in = formData.check_in;
       if (formData.check_out) params.check_out = formData.check_out;
       if (formData.min_price) params.min_price = parseFloat(formData.min_price);

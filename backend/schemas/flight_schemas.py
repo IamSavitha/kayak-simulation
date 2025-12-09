@@ -114,7 +114,7 @@ class FlightSearchParams(BaseModel):
     sort_by: Optional[str] = Field(default="price", description="price, duration, departure")
     sort_order: Optional[str] = Field(default="asc", description="asc or desc")
     page: int = Field(default=1, ge=1)
-    page_size: int = Field(default=20, ge=1, le=100)
+    page_size: int = Field(default=20, ge=1, le=1000)
     
     @field_validator('departure_airport', 'arrival_airport')
     @classmethod

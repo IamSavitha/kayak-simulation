@@ -45,11 +45,20 @@ const AdminFlightManagement: React.FC = () => {
     }
 
     setAuthLoading(false);
-  }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // navigate is stable, don't include it
 
   useEffect(() => {
     if (!authLoading) {
       loadFlights();
+
+      // Set up auto-refresh every 10 seconds for real-time updates
+      const refreshInterval = setInterval(() => {
+        loadFlights();
+      }, 10000);
+
+      // Cleanup interval on unmount
+      return () => clearInterval(refreshInterval);
     }
   }, [authLoading]);
 

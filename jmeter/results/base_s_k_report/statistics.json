@@ -1,0 +1,50 @@
+{
+  "Total" : {
+    "transaction" : "Total",
+    "sampleCount" : 903019,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 31.563020268676148,
+    "medianResTime" : 38.0,
+    "minResTime" : 0.0,
+    "maxResTime" : 304.0,
+    "pct1ResTime" : 78.0,
+    "pct2ResTime" : 89.0,
+    "pct3ResTime" : 122.0,
+    "throughput" : 3009.942935615909,
+    "receivedKBytesPerSec" : 15190.625021483516,
+    "sentKBytesPerSec" : 423.27204047254776
+  },
+  "Search Flights" : {
+    "transaction" : "Search Flights",
+    "sampleCount" : 451503,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 60.41952766648308,
+    "medianResTime" : 60.0,
+    "minResTime" : 1.0,
+    "maxResTime" : 304.0,
+    "pct1ResTime" : 87.0,
+    "pct2ResTime" : 97.0,
+    "pct3ResTime" : 128.0,
+    "throughput" : 1505.0601686722891,
+    "receivedKBytesPerSec" : 13873.303644626696,
+    "sentKBytesPerSec" : 252.80307520667355
+  },
+  "Home Page" : {
+    "transaction" : "Home Page",
+    "sampleCount" : 451516,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 2.7073437043205746,
+    "medianResTime" : 3.0,
+    "minResTime" : 0.0,
+    "maxResTime" : 179.0,
+    "pct1ResTime" : 5.0,
+    "pct2ResTime" : 6.0,
+    "pct3ResTime" : 9.0,
+    "throughput" : 1505.1988358874692,
+    "receivedKBytesPerSec" : 1318.5189021397068,
+    "sentKBytesPerSec" : 170.51080562787735
+  }
+}

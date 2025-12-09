@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, MapPin, Save, Loader2, CreditCard } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Mail, Phone, MapPin, Save, Loader2, CreditCard, Camera, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getUserProfile, updateUserProfile, UserProfile, UpdateProfileData } from '../api/auth';
 
@@ -11,6 +11,9 @@ const ProfilePage: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -61,6 +64,37 @@ const ProfilePage: React.FC = () => {
     });
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select an image file');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image size must be less than 5MB');
+        return;
+      }
+      
+      setSelectedImage(file);
+      setError('');
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !token) {
@@ -84,8 +118,14 @@ const ProfilePage: React.FC = () => {
         zip_code: formData.zip_code || undefined,
       };
 
-      const updatedProfile = await updateUserProfile(user.user_id, updateData, token);
+      const updatedProfile = await updateUserProfile(user.user_id, updateData, token, selectedImage || undefined);
       setProfile(updatedProfile);
+      
+      // Clear image selection after successful upload
+      if (selectedImage) {
+        setSelectedImage(null);
+        setImagePreview(null);
+      }
       
       // Update AuthContext with new user data
       updateUser({
@@ -147,6 +187,50 @@ const ProfilePage: React.FC = () => {
         )}
 
         <div className="card p-8">
+          {/* Profile Picture Section */}
+          <div className="flex flex-col items-center mb-8 pb-8 border-b border-slate-200">
+            <div className="relative mb-4">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-300 bg-slate-100 flex items-center justify-center">
+                {imagePreview ? (
+                  <img src={imagePreview} alt="Profile preview" className="w-full h-full object-cover" />
+                ) : profile?.profile_image_url ? (
+                  <img src={profile.profile_image_url} alt={`${profile.first_name} ${profile.last_name}`} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                    <span className="text-white text-3xl font-bold">
+                      {profile?.first_name?.[0] || user?.first_name?.[0] || 'U'}
+                      {profile?.last_name?.[0] || user?.last_name?.[0] || ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={handleImageClick}
+                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+                  title="Change profile picture"
+                >
+                  <Camera size={18} />
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </div>
+            <h3 className="text-xl font-semibold text-slate-900">
+              {profile?.first_name} {profile?.last_name}
+            </h3>
+            <p className="text-slate-600 text-sm">{profile?.email || user?.email}</p>
+            {isEditing && (
+              <p className="text-xs text-slate-500 mt-2">Click the camera icon to change your profile picture</p>
+            )}
+          </div>
+
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-slate-900">Personal Information</h2>
             {!isEditing && (

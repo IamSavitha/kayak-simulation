@@ -58,7 +58,14 @@ class ConciergeAgent:
             }
         
         # Generate response based on intent
-        if intent == "flight_query":
+        if intent == "hotel_query":
+            hotel_response = await self._handle_hotel_query(message, context)
+            return {
+                "message": hotel_response,
+                "context": context
+            }
+        
+        elif intent == "flight_query":
             flight_response = await self._handle_flight_query(message, context)
             return {
                 "message": flight_response,
@@ -103,9 +110,15 @@ class ConciergeAgent:
                 "context": context
             }
         
+        elif intent == "book":
+            booking_response = await self._handle_booking_request(message, user_id, context)
+            return booking_response
+        
         else:
+            # More intelligent default response based on message content
+            response_msg = self._generate_intelligent_response(message, context)
             return {
-                "message": "I'd be happy to help you find the perfect trip! Tell me where you'd like to go, your dates, and budget, and I'll find the best options for you.",
+                "message": response_msg,
                 "context": context
             }
     
@@ -123,7 +136,27 @@ class ConciergeAgent:
                                  re.search(r'from\s+[A-Z]{3}\s+to\s+[A-Z]{3}', message_upper) or
                                  re.search(r'[A-Z]{3}-[A-Z]{3}', message_upper))
         
-        # Check for flight-specific queries (highest priority)
+        # Check for booking intent FIRST (before flight_query)
+        if any(phrase in message_lower for phrase in ["book this", "book the", "book that", "reserve this", "reserve the", "i want to book", "can you book", "please book", "purchase", "buy this", "confirm booking"]):
+            return "book"
+        
+        # Check for explicit booking with listing ID (more flexible pattern)
+        if "book" in message_lower:
+            # Check if message contains a listing ID pattern
+            if re.search(r'\b[A-Z]{2}\d{4,6}\b', message_upper):  # Flight ID
+                return "book"
+            if re.search(r'\bH\d{6,7}\b', message_upper):  # Hotel ID
+                return "book"
+            if re.search(r'\bCAR\d{3,6}\b', message_upper):  # Car ID
+                return "book"
+        
+        # Check for hotel-specific queries (BEFORE flight check)
+        if any(word in message_lower for word in ["hotel", "hotels", "stay", "accommodation", "room", "check-in", "check-out", "lodging"]):
+            # Make sure it's not asking about flights to a hotel city
+            if "flight" not in message_lower and "fly" not in message_lower:
+                return "hotel_query"
+        
+        # Check for flight-specific queries
         if any(word in message_lower for word in ["flight", "flights", "fly"]):
             return "flight_query"
         
@@ -149,7 +182,7 @@ class ConciergeAgent:
         if any(word in message_lower for word in ["make it", "change", "instead", "but", "without"]):
             return "refine"
         
-        if any(word in message_lower for word in ["find", "search", "book", "trip", "travel", "stay", "looking for"]):
+        if any(word in message_lower for word in ["find", "search", "trip", "travel", "stay", "looking for"]):
             return "search"
         
         return "general"
@@ -243,14 +276,16 @@ class ConciergeAgent:
                 constraints["dates"] = match.group(1)
                 break
         
-        # Destination extraction (city names)
+        # Destination/City extraction (city names)
         cities = ["tokyo", "miami", "new york", "san francisco", "los angeles", 
                   "chicago", "seattle", "boston", "denver", "austin", "atlanta",
-                  "phoenix", "las vegas", "dallas", "houston"]
+                  "phoenix", "las vegas", "dallas", "houston", "city"]
         for city in cities:
             if city in message_lower:
                 if not constraints.get("destination"):
                     constraints["destination"] = city.title()
+                if not constraints.get("city"):
+                    constraints["city"] = city.title()
                 break
         
         # Origin extraction
@@ -272,12 +307,39 @@ class ConciergeAgent:
         if "refund" in message_lower:
             constraints["refundable"] = True
         
-        # Number of travelers
+        # Number of travelers/guests
         travelers_match = re.search(r'(\d+)\s*(?:people|travelers|guests|of us)', message_lower)
         if travelers_match:
             constraints["num_travelers"] = int(travelers_match.group(1))
+            constraints["num_guests"] = int(travelers_match.group(1))
         elif "two" in message_lower or "couple" in message_lower:
             constraints["num_travelers"] = 2
+            constraints["num_guests"] = 2
+        
+        # Hotel-specific: check-in/check-out dates
+        # Pattern: "check-in Dec 15" or "from Dec 15 to Dec 17"
+        check_in_match = re.search(r'(?:check-in|check in|from)\s+((?:dec|december|jan|january)\s+\d{1,2}|\d{1,2}/\d{1,2}|\d{4}-\d{2}-\d{2})', message_lower)
+        if check_in_match:
+            constraints["check_in_date"] = check_in_match.group(1)
+        
+        check_out_match = re.search(r'(?:check-out|check out|to|until)\s+((?:dec|december|jan|january)\s+\d{1,2}|\d{1,2}/\d{1,2}|\d{4}-\d{2}-\d{2})', message_lower)
+        if check_out_match:
+            constraints["check_out_date"] = check_out_match.group(1)
+        
+        # Star rating extraction
+        star_match = re.search(r'(\d)\s*(?:-)?star', message_lower)
+        if star_match:
+            constraints["star_rating"] = int(star_match.group(1))
+        
+        # Amenities
+        if "wifi" in message_lower or "wi-fi" in message_lower:
+            constraints["amenities"] = constraints.get("amenities", []) + ["WiFi"]
+        if "parking" in message_lower:
+            constraints["amenities"] = constraints.get("amenities", []) + ["Parking"]
+        if "pool" in message_lower:
+            constraints["amenities"] = constraints.get("amenities", []) + ["Pool"]
+        if "gym" in message_lower or "fitness" in message_lower:
+            constraints["amenities"] = constraints.get("amenities", []) + ["Gym"]
         
         return constraints
     
@@ -482,6 +544,103 @@ class ConciergeAgent:
             self.watches[watch_id]["active"] = False
             logger.info(f"Removed watch {watch_id}")
     
+    async def _handle_hotel_query(self, message: str, context: Dict) -> str:
+        """Handle hotel-specific queries."""
+        import sys
+        import os
+        
+        # Import backend modules for database access
+        backend_path = os.path.join(os.path.dirname(__file__), '../../backend')
+        if os.path.exists(backend_path):
+            sys.path.insert(0, os.path.abspath(backend_path))
+        
+        try:
+            from backend.common.database import get_mysql_context
+            from backend.models.mysql_models import Hotel, HotelRoom
+            
+            # Extract city from context or message
+            city = context.get("destination") or context.get("city")
+            
+            # Try to extract city from message if not in context
+            if not city:
+                message_lower = message.lower()
+                # Common cities
+                city_keywords = ["los angeles", "new york", "chicago", "miami", "san francisco", 
+                               "boston", "seattle", "denver", "atlanta", "phoenix", "las vegas", 
+                               "dallas", "houston", "city"]
+                for keyword in city_keywords:
+                    if keyword in message_lower:
+                        city = keyword.title()
+                        context["city"] = city
+                        break
+            
+            if not city:
+                return "I'd love to help you find hotels! Please tell me which city you're looking for, along with your check-in and check-out dates. For example: 'Hotels in Los Angeles from Dec 15 to Dec 17'"
+            
+            # Extract dates and preferences
+            check_in = context.get("check_in_date")
+            check_out = context.get("check_out_date")
+            star_rating = context.get("star_rating")
+            
+            with get_mysql_context() as db:
+                query = db.query(Hotel).filter(Hotel.is_active == True)
+                
+                # Filter by city (case-insensitive)
+                query = query.filter(Hotel.city.ilike(f"%{city}%"))
+                
+                # Filter by star rating if specified
+                if star_rating:
+                    query = query.filter(Hotel.star_rating >= star_rating)
+                
+                hotels = query.limit(10).all()
+                
+                if not hotels:
+                    return f"I couldn't find any hotels in {city}. Would you like to search in a different city? Try 'City', 'Los Angeles', 'New York', etc."
+                
+                # Format hotel information
+                response = f"I found {len(hotels)} hotel(s) in {city}:\n\n"
+                
+                for i, hotel in enumerate(hotels[:5], 1):  # Show up to 5 hotels
+                    response += f"{i}. **{hotel.hotel_name}** ({'⭐' * hotel.star_rating})\n"
+                    response += f"   📍 {hotel.address}, {hotel.city}, {hotel.state}\n"
+                    
+                    # Get room info
+                    rooms = db.query(HotelRoom).filter(
+                        HotelRoom.hotel_id == hotel.hotel_id,
+                        HotelRoom.is_active == True,
+                        HotelRoom.available_rooms > 0
+                    ).all()
+                    
+                    if rooms:
+                        min_price = min(float(room.price_per_night) for room in rooms)
+                        response += f"   💰 From ${min_price:.2f}/night\n"
+                        response += f"   🛏️ {len(rooms)} room types available\n"
+                    
+                    if hotel.amenities:
+                        amenities = hotel.amenities.split(',')[:3] if isinstance(hotel.amenities, str) else []
+                        if amenities:
+                            response += f"   ✨ {', '.join(amenities)}\n"
+                    
+                    response += f"   Hotel ID: {hotel.hotel_id}\n\n"
+                
+                if len(hotels) > 5:
+                    response += f"... and {len(hotels) - 5} more hotel(s).\n\n"
+                
+                response += "\nTo book a hotel, you can say:\n"
+                response += f"- 'Book hotel {hotels[0].hotel_id}'\n"
+                response += "- Or go to the Hotels page to see photos and full details\n\n"
+                
+                if check_in and check_out:
+                    response += f"Check-in: {check_in} | Check-out: {check_out}"
+                else:
+                    response += "💡 Tip: Tell me your check-in and check-out dates for availability checking!"
+                
+                return response
+                
+        except Exception as e:
+            logger.error(f"Error querying hotels: {e}")
+            return "I'm having trouble accessing the hotel database right now. Please try again in a moment, or visit the Hotels page directly to search."
+    
     async def _handle_flight_query(self, message: str, context: Dict) -> str:
         """Handle flight-specific queries like 'how many flights from X to Y'."""
         import sys
@@ -557,4 +716,184 @@ class ConciergeAgent:
         except Exception as e:
             logger.error(f"Error querying flights: {e}")
             return "I'm having trouble accessing the flight database right now. Please try again in a moment, or try a different query."
+    
+    async def _handle_booking_request(self, message: str, user_id: Optional[str], context: Dict) -> Dict[str, Any]:
+        """Handle booking requests from the user."""
+        import httpx
+        from datetime import datetime
+        
+        message_lower = message.lower()
+        
+        # Check if user is authenticated
+        if not user_id:
+            return {
+                "message": "To complete a booking, please log in to your account first. You can log in at http://localhost:3000/login",
+                "requires_login": True,
+                "context": context
+            }
+        
+        # Extract booking details from message or context
+        listing_id = None
+        listing_type = None
+        
+        # Try to extract listing ID from message (e.g., "book flight FL013689")
+        flight_id_match = re.search(r'\b([A-Z]{2}\d{4,6})\b', message.upper())
+        hotel_id_match = re.search(r'\b(H\d{6,7})\b', message.upper())
+        car_id_match = re.search(r'\b(CAR\d{3,6})\b', message.upper())
+        
+        if flight_id_match:
+            listing_id = flight_id_match.group(1)
+            listing_type = "flight"
+        elif hotel_id_match:
+            listing_id = hotel_id_match.group(1)
+            listing_type = "hotel"
+        elif car_id_match:
+            listing_id = car_id_match.group(1)
+            listing_type = "car"
+        elif "flight" in message_lower:
+            listing_type = "flight"
+        elif "hotel" in message_lower:
+            listing_type = "hotel"
+        elif "car" in message_lower:
+            listing_type = "car"
+        
+        # Check context for selected item
+        if not listing_id and context.get("selected_listing_id"):
+            listing_id = context["selected_listing_id"]
+            listing_type = context.get("selected_listing_type", "flight")
+        
+        # Extract booking parameters
+        num_passengers = context.get("num_travelers", 1)
+        check_in = context.get("check_in_date")
+        check_out = context.get("check_out_date")
+        
+        # Parse dates from message if not in context
+        if not check_in:
+            date_match = re.search(r'(\d{4}-\d{2}-\d{2})', message)
+            if date_match:
+                check_in = date_match.group(1) + " 12:00:00"
+                check_out = (datetime.strptime(date_match.group(1), "%Y-%m-%d") + timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
+        
+        # If we have specific listing ID, proceed with booking
+        if listing_id and listing_type:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    # First, fetch the listing details to get the correct dates
+                    if listing_type == "flight" and not check_in:
+                        try:
+                            flight_response = await client.get(f"http://flight-service:8000/flights/{listing_id}")
+                            if flight_response.status_code == 200:
+                                flight_data = flight_response.json()
+                                departure_dt = flight_data.get("departure_datetime")
+                                if departure_dt:
+                                    # Convert ISO format (2025-12-07T11:00:31) to booking format (2025-12-07 11:00:31)
+                                    check_in = departure_dt.replace('T', ' ')
+                        except Exception as e:
+                            logger.error(f"Error fetching flight details: {e}")
+                            pass
+                    
+                    # Create booking
+                    booking_payload = {
+                        "user_id": user_id,
+                        "booking_type": listing_type,
+                        "listing_id": listing_id,
+                    }
+                    
+                    if listing_type == "flight":
+                        booking_payload["num_passengers"] = num_passengers
+                        booking_payload["check_in_date"] = check_in or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    elif listing_type == "hotel":
+                        booking_payload["check_in_date"] = check_in or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        booking_payload["check_out_date"] = check_out or (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S")
+                        booking_payload["num_rooms"] = context.get("num_rooms", 1)
+                    elif listing_type == "car":
+                        booking_payload["check_in_date"] = check_in or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        booking_payload["check_out_date"] = check_out or (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # Call booking service
+                    response = await client.post(
+                        "http://booking-service:8000/bookings",
+                        json=booking_payload,
+                        headers={"Content-Type": "application/json"}
+                    )
+                    
+                    if response.status_code == 201:
+                        booking_data = response.json()
+                        booking_id = booking_data.get("booking_id")
+                        total_price = float(booking_data.get("total_price", 0))
+                        
+                        return {
+                            "message": f"✅ Great! Your {listing_type} has been booked successfully!\n\n"
+                                     f"Booking ID: {booking_id}\n"
+                                     f"Listing ID: {listing_id}\n"
+                                     f"Total Price: ${total_price:.2f}\n\n"
+                                     f"Your booking confirmation has been sent. To complete payment, please visit: http://localhost:3000/my-trips",
+                            "booking_id": booking_id,
+                            "booking_success": True,
+                            "context": {**context, "last_booking_id": booking_id}
+                        }
+                    else:
+                        error_detail = response.json().get("detail", "Unknown error")
+                        return {
+                            "message": f"I encountered an issue while booking: {error_detail}\n\n"
+                                     f"Please try again or contact support if the problem persists.",
+                            "booking_success": False,
+                            "context": context
+                        }
+                        
+            except Exception as e:
+                logger.error(f"Booking error: {e}")
+                return {
+                    "message": f"I'm having trouble completing your booking right now. Error: {str(e)}\n\n"
+                             f"Please try booking directly at: http://localhost:3000/{listing_type}s",
+                    "booking_success": False,
+                    "context": context
+                }
+        
+        # If no specific listing, ask for clarification
+        return {
+            "message": "I'd love to help you book! To proceed, please specify:\n\n"
+                     "1. What you want to book (flight/hotel/car)\n"
+                     "2. The listing ID (e.g., 'book flight FL013689')\n\n"
+                     "Or you can say something like:\n"
+                     "- 'Book the first flight'\n"
+                     "- 'Reserve hotel H0000007'\n"
+                     "- 'Book that Southwest flight'",
+            "clarification_needed": True,
+            "context": context
+        }
+    
+    def _generate_intelligent_response(self, message: str, context: Dict) -> str:
+        """Generate an intelligent response based on message content."""
+        message_lower = message.lower()
+        
+        # Check for greetings
+        if any(word in message_lower for word in ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]):
+            return "Hello! I'm your travel concierge. I can help you find flights, hotels, cars, and create perfect travel packages. What are you looking to book?"
+        
+        # Check for location mentions without dates
+        city_keywords = ["chicago", "miami", "new york", "los angeles", "san francisco", "boston", "seattle", "denver"]
+        mentioned_city = next((city for city in city_keywords if city in message_lower), None)
+        
+        if mentioned_city:
+            return f"Interested in {mentioned_city.title()}? Great choice! When would you like to travel? Please let me know your dates and I can find the best flight and hotel options for you."
+        
+        # Check for date mentions without location
+        if any(word in message_lower for word in ["december", "january", "next week", "next month", "weekend"]):
+            return "I see you have dates in mind! Where would you like to go? Tell me your departure city and destination, and I'll find great options for you."
+        
+        # Check for budget mentions
+        if any(word in message_lower for word in ["budget", "cheap", "affordable", "$", "dollar"]):
+            return "I can help you find the best deals within your budget! To get started, tell me: where do you want to go, when, and what's your approximate budget?"
+        
+        # Check for hotel/accommodation mentions
+        if any(word in message_lower for word in ["hotel", "stay", "accommodation", "room", "lodging"]):
+            return "Looking for a place to stay? I can find hotels that match your preferences. Tell me the city, check-in/out dates, and any specific requirements (like amenities or star rating)."
+        
+        # Check for car mentions
+        if any(word in message_lower for word in ["car", "rental", "drive", "vehicle"]):
+            return "Need a rental car? I can help with that! Let me know the city, pickup/dropoff dates, and what type of car you're looking for."
+        
+        # Default helpful response
+        return "I'm here to help you plan your perfect trip! You can ask me about:\n• Flights between cities\n• Hotels in any destination\n• Car rentals\n• Complete travel packages\n• Deals and price alerts\n\nJust tell me where you want to go, when, and any preferences you have!"
 

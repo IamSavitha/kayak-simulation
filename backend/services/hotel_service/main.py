@@ -75,7 +75,7 @@ async def search_hotels(
     sort_by: str = Query(default="price"),
     sort_order: str = Query(default="asc"),
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
+    page_size: int = Query(default=20, ge=1, le=1000),
     db: Session = Depends(get_mysql_session)
 ):
     """Search for hotels with filters."""

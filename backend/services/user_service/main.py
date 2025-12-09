@@ -1,7 +1,7 @@
 """
 User Service - FastAPI application for user management.
 """
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -157,12 +157,42 @@ async def get_user(
 @app.put("/users/{user_id}", response_model=UserResponse)
 async def update_user(
     user_id: str,
-    user_data: UserUpdate,
+    request: Request,
     db: Session = Depends(get_mysql_session)
 ):
-    """Update user information."""
+    """Update user information with optional profile image upload."""
+    import json
+    from ...services.admin_service.image_upload import save_uploaded_image
+    
+    # Check if request is multipart/form-data (image upload) or application/json
+    content_type = request.headers.get("content-type", "")
+    
+    if "multipart/form-data" in content_type:
+        # Handle FormData with image
+        form = await request.form()
+        
+        # Get user_data from form
+        user_data_str = form.get("user_data")
+        if user_data_str:
+            data = json.loads(user_data_str)
+        else:
+            data = {}
+        
+        # Get image file
+        image = form.get("image")
+        image_url = None
+        if image and hasattr(image, 'filename') and image.filename:
+            image_url = await save_uploaded_image(image, "user", user_id)
+            data["profile_image_url"] = image_url
+        
+        user_update = UserUpdate(**data)
+    else:
+        # Handle JSON request
+        body = await request.json()
+        user_update = UserUpdate(**body)
+    
     service = UserService(db)
-    user = service.update_user(user_id, user_data)
+    user = service.update_user(user_id, user_update)
     if not user:
         handle_not_found("User", user_id)
     return user

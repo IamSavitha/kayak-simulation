@@ -3,7 +3,7 @@ import { Hotel, MapPin, Calendar, Users, Search, Filter, Star, Wifi, Coffee, Par
 import { searchHotels, Hotel as HotelAPI, HotelSearchParams, getHotel } from '../api/hotels';
 import { useAuth } from '../context/AuthContext';
 import { createBooking, BookingCreate } from '../api/bookings';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PaymentModal from '../components/PaymentModal';
 import { BillingResponse } from '../api/billing';
 
@@ -38,6 +38,7 @@ const HotelsPage: React.FC = () => {
   const [booking, setBooking] = useState<any>(null);
   const { user, token, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [urlSearchParams] = useSearchParams();
   
   // Editable booking parameters in modal
   const [bookingParams, setBookingParams] = useState({
@@ -58,31 +59,30 @@ const HotelsPage: React.FC = () => {
     amenities: [] as string[]
   });
 
-  // Generate hotel image URL - exactly like cars page approach
+  // Generate hotel image URL - using reliable Unsplash Source URLs
   const getHotelImage = (hotelName: string, city: string, hotelId?: string): string => {
-    // Verified hotel image URLs from Unsplash (same format as cars page)
-    // Using the same reliable URLs that work for cars
+    // Updated hotel image URLs with proper format
     const hotelImages = [
-      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1571896346562-66123b1b1cfa?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1551884170-09c70a23afe8?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1564501049412-61c2d308c1b8?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1582719508467-0b99ccb8756b?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1571003123894-1f0595d1b052?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1551884170-83640b692829?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1492144534655-ae79c475cae3?w=400&h=300&fit=crop', // Same default as cars
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=400&h=300',
+      'https://images.unsplash.com/photo-1571896346562-66123b1b1cfa?auto=format&fit=crop&w=400&h=300',
+      'https://images.unsplash.com/photo-1551884170-09c70a23afe8?auto=format&fit=crop&w=400&h=300',
+      'https://images.unsplash.com/photo-1564501049412-61c2d308c1b8?auto=format&fit=crop&w=400&h=300',
+      'https://images.unsplash.com/photo-1582719508467-0b99ccb8756b?auto=format&fit=crop&w=400&h=300',
+      'https://images.unsplash.com/photo-1571003123894-1f0595d1b052?auto=format&fit=crop&w=400&h=300',
+      'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=400&h=300',
+      'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=400&h=300',
+      'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=400&h=300',
+      'https://images.unsplash.com/photo-1496417263034-38ec4f0b665a?auto=format&fit=crop&w=400&h=300',
     ];
     
-    // Use hotel name + city to deterministically select an image (exactly like cars page)
+    // Use hotel name + city to deterministically select an image
     const seedString = (hotelName || '') + (city || '') + (hotelId || '');
     const seed = seedString.split('').reduce((acc, char) => {
       return ((acc << 5) - acc) + char.charCodeAt(0);
     }, 0);
     
     const imageIndex = Math.abs(seed) % hotelImages.length;
-    const defaultImage = 'https://images.unsplash.com/photo-1492144534655-ae79c475cae3?w=400&h=300&fit=crop'; // Same default as cars
+    const defaultImage = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=400&h=300';
     return hotelImages[imageIndex] || defaultImage;
   };
 
@@ -116,7 +116,7 @@ const HotelsPage: React.FC = () => {
       location: cityState,
       rating: hotel.rating || hotel.star_rating || 4.0,
       reviews: hotel.total_reviews || 0,
-      price: 150, // Default price - would need room pricing
+      price: (hotel as any).min_price || 150, // Use minimum room price from API
       image: getHotelImage(hotel.hotel_name || '', hotel.city || '', hotel.hotel_id),
       amenities: amenitiesList,
       roomType: 'Standard Room',
@@ -128,6 +128,17 @@ const HotelsPage: React.FC = () => {
   useEffect(() => {
     loadHotels();
   }, []);
+
+  // Handle hotel_id from URL query params (from deals page)
+  useEffect(() => {
+    const hotelId = urlSearchParams.get('hotel_id');
+    if (hotelId && hotels.length > 0) {
+      // Small delay to ensure hotels are loaded
+      setTimeout(() => {
+        handleViewDetails(hotelId);
+      }, 500);
+    }
+  }, [urlSearchParams, hotels]);
 
   // Apply filters whenever hotels or filters change
   useEffect(() => {
@@ -165,7 +176,7 @@ const HotelsPage: React.FC = () => {
     try {
       const params: HotelSearchParams = {
         page: 1,
-        page_size: 100 // Show more hotels
+        page_size: 1000 // Show all hotels
       };
       
       if (searchParams.city) {

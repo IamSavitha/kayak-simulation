@@ -10,7 +10,14 @@ export default defineConfig({
       '/api/users': {
         target: 'http://user-service:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/users/, ''),
+        rewrite: (path) => {
+          // Auth endpoints are at root level: /auth/login, /auth/me
+          if (path.indexOf('/api/users/auth/') === 0) {
+            return path.replace(/^\/api\/users/, '');
+          }
+          // User CRUD endpoints are under /users: /users, /users/{id}
+          return path.replace(/^\/api\/users/, '/users');
+        },
       },
       '/api/flights': {
         target: 'http://flight-service:8000',
@@ -30,12 +37,21 @@ export default defineConfig({
       '/api/admin': {
         target: 'http://admin-service:8000',
         changeOrigin: true,
+        secure: false,
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Ensure Authorization header is forwarded
+            if (req.headers.authorization) {
+              proxyReq.setHeader('Authorization', req.headers.authorization);
+            }
+          });
+        },
         rewrite: (path) => path.replace(/^\/api\/admin/, ''),
       },
       '/api/search': {
         target: 'http://search-service:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/search/, ''),
+        rewrite: (path) => path.replace(/^\/api\/search/, '/search'),
       },
       '/api/booking': {
         target: 'http://booking-service:8000',
@@ -48,9 +64,14 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/billing/, ''),
       },
       '/api/ai': {
-        target: 'http://localhost:8008',
+        target: 'http://ai-service:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/ai/, '/api'),
+      },
+      '/api/deals': {
+        target: 'http://ai-service:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/deals/, '/api/deals'),
       },
     },
   },

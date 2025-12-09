@@ -340,7 +340,14 @@ const DealsPage: React.FC = () => {
                     )}
 
                     {/* View Deal Button */}
-                    <button className="w-full mt-4 px-4 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-lg font-semibold hover:from-slate-800 hover:to-slate-900 transition-all flex items-center justify-center space-x-2 group-hover:shadow-lg">
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDealClick(deal);
+                      }}
+                      className="w-full mt-4 px-4 py-2 bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-lg font-semibold hover:from-slate-800 hover:to-slate-900 transition-all flex items-center justify-center space-x-2 group-hover:shadow-lg"
+                    >
                       <span>View Deal</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </button>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Users, Plane, Hotel, Car, DollarSign, BarChart3, Settings, Calendar } from 'lucide-react';
 import { getDashboardStats, getAllBookings, DashboardStats, AdminBooking } from '../api/adminBookings';
@@ -10,6 +10,36 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadDashboardStats = useCallback(async () => {
+    const adminToken = localStorage.getItem('admin_token');
+    if (!adminToken) return;
+    
+    try {
+      const statsData = await getDashboardStats(adminToken);
+      setStats(statsData);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+    }
+  }, []);
+
+  const loadBookings = useCallback(async () => {
+    const adminToken = localStorage.getItem('admin_token');
+    if (!adminToken) return;
+    
+    setBookingsLoading(true);
+    try {
+      const bookingsData = await getAllBookings(adminToken, 1, 10);
+      setBookings(bookingsData.bookings);
+    } catch (error) {
+      console.error('Error loading bookings:', error);
+    } finally {
+      setBookingsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     // Check if admin is logged in
@@ -35,37 +65,26 @@ const AdminDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error parsing admin data:', error);
       navigate('/admin/login');
+      return;
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
 
-  const loadDashboardStats = async () => {
-    const adminToken = localStorage.getItem('admin_token');
-    if (!adminToken) return;
-    
-    try {
-      const statsData = await getDashboardStats(adminToken);
-      setStats(statsData);
-    } catch (error) {
-      console.error('Error loading dashboard stats:', error);
-    }
-  };
+    // Set up auto-refresh every 5 seconds for real-time updates
+    refreshIntervalRef.current = setInterval(() => {
+      loadDashboardStats();
+      loadBookings();
+    }, 5000);
 
-  const loadBookings = async () => {
-    const adminToken = localStorage.getItem('admin_token');
-    if (!adminToken) return;
-    
-    setBookingsLoading(true);
-    try {
-      const bookingsData = await getAllBookings(adminToken, 1, 10);
-      setBookings(bookingsData.bookings);
-    } catch (error) {
-      console.error('Error loading bookings:', error);
-    } finally {
-      setBookingsLoading(false);
-    }
-  };
+    // Cleanup interval on unmount
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount - navigate is stable, functions are memoized
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
@@ -102,6 +121,9 @@ const AdminDashboard: React.FC = () => {
               </h1>
               <p className="mt-2 text-slate-600">
                 Welcome back, {admin.first_name} {admin.last_name} ({admin.role})
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                🔄 Auto-refreshing every 5 seconds • Last updated: {lastUpdated.toLocaleTimeString()}
               </p>
             </div>
             <button
@@ -165,7 +187,21 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-slate-200">
+            <div className="flex items-center mb-4">
+              <BarChart3 className="text-purple-600 mr-3" size={24} />
+              <h3 className="text-xl font-bold text-slate-900">Analytics</h3>
+            </div>
+            <p className="text-slate-600 mb-4">Revenue reports and charts</p>
+            <button 
+              onClick={() => navigate('/admin/analytics')}
+              className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all shadow-md"
+            >
+              View Analytics
+            </button>
+          </div>
+
           <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-slate-200">
             <div className="flex items-center mb-4">
               <Plane className="text-blue-600 mr-3" size={24} />

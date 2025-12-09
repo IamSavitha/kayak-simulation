@@ -56,8 +56,9 @@ const BookingModal: React.FC<BookingModalProps> = ({ flight, isOpen, onClose, on
       // Use the actual departure datetime from the flight data
       let checkInDate: string;
       if (flight.departure_datetime) {
-        // Use the actual datetime from the API
-        checkInDate = new Date(flight.departure_datetime).toISOString();
+        // Use the exact datetime from the API without conversion
+        // This preserves the original date/time from the flight data
+        checkInDate = flight.departure_datetime;
       } else {
         // Fallback: construct from departure time (shouldn't happen if API is correct)
         const today = new Date();

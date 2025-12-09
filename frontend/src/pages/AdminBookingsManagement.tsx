@@ -33,7 +33,16 @@ const AdminBookingsManagement: React.FC = () => {
     }
 
     loadBookings();
-  }, [page, filterType, filterStatus, navigate]);
+
+    // Set up auto-refresh every 10 seconds for real-time updates
+    const refreshInterval = setInterval(() => {
+      loadBookings();
+    }, 10000);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(refreshInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, filterType, filterStatus]); // navigate is stable, don't include it
 
   const loadBookings = async () => {
     const adminToken = localStorage.getItem('admin_token');

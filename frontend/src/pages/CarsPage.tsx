@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Car, MapPin, Calendar, Search, Filter, Star, Users, Fuel, Gauge, ArrowRight, DollarSign, Luggage, X, Loader2, CheckCircle } from 'lucide-react';
 import { searchCars, Car as CarAPI, CarSearchParams } from '../api/cars';
 import { useAuth } from '../context/AuthContext';
@@ -28,12 +29,14 @@ interface CarRental {
 const CarsPage: React.FC = () => {
   const { user, token, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [urlParams] = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
   const [cars, setCars] = useState<CarRental[]>([]);
   const [filteredCars, setFilteredCars] = useState<CarRental[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCar, setSelectedCar] = useState<CarRental | null>(null);
+  const [highlightedCarId, setHighlightedCarId] = useState<string | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
@@ -130,13 +133,34 @@ const CarsPage: React.FC = () => {
     setFilteredCars(filtered);
   }, [cars, filters]);
 
+  // Handle car_id from URL (when coming from deals page)
+  useEffect(() => {
+    const carId = urlParams.get('car_id');
+    if (carId && filteredCars.length > 0) {
+      setHighlightedCarId(carId);
+      
+      // Find and scroll to the car
+      setTimeout(() => {
+        const element = document.getElementById(`car-${carId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+      
+      // Clear highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedCarId(null);
+      }, 3000);
+    }
+  }, [urlParams, filteredCars]);
+
   const loadCars = async () => {
     setLoading(true);
     setError(null);
     try {
       const params: CarSearchParams = {
         page: 1,
-        page_size: 100 // Show all cars
+        page_size: 1000 // Show all cars
       };
       
       if (searchParams.city) {
@@ -562,6 +586,7 @@ const CarsPage: React.FC = () => {
                     car={car} 
                     delay={index * 100}
                     onReserve={() => handleReserve(car)}
+                    isHighlighted={highlightedCarId === car.id}
                   />
               ))}
             </div>
@@ -752,11 +777,13 @@ interface CarCardProps {
   car: CarRental;
   delay: number;
   onReserve: () => void;
+  isHighlighted?: boolean;
 }
 
-const CarCard: React.FC<CarCardProps> = ({ car, delay, onReserve }) => (
+const CarCard: React.FC<CarCardProps> = ({ car, delay, onReserve, isHighlighted }) => (
   <div
-    className="card-interactive p-0 overflow-hidden animate-slide-up"
+    id={`car-${car.id}`}
+    className={`card-interactive p-0 overflow-hidden animate-slide-up ${isHighlighted ? 'ring-4 ring-blue-500 ring-offset-2' : ''}`}
     style={{ animationDelay: `${delay}ms` }}
   >
     {/* Car Image */}

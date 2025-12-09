@@ -50,7 +50,7 @@ export async function signup(data: SignupData, imageFile?: File): Promise<any> {
       formData.append('image', imageFile);
     }
 
-    const response = await fetch(`${API_BASE_URL}/users`, {
+    const response = await fetch(`${API_BASE_URL}`, {
       method: 'POST',
       // Don't set Content-Type header - browser will set it with boundary for FormData
       body: formData,
@@ -154,7 +154,7 @@ export interface UpdateProfileData {
  */
 export async function getUserProfile(userId: string, token: string): Promise<UserProfile> {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+    const response = await fetch(`${API_BASE_URL}/${userId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -173,22 +173,42 @@ export async function getUserProfile(userId: string, token: string): Promise<Use
 }
 
 /**
- * Update user profile
+ * Update user profile with optional image upload
  */
 export async function updateUserProfile(
   userId: string,
   data: UpdateProfileData,
-  token: string
+  token: string,
+  imageFile?: File
 ): Promise<UserProfile> {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
+    let response: Response;
+    
+    if (imageFile) {
+      // Use FormData for image upload
+      const formData = new FormData();
+      formData.append('user_data', JSON.stringify(data));
+      formData.append('image', imageFile);
+      
+      response = await fetch(`${API_BASE_URL}/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type - browser will set it with boundary for FormData
+        },
+        body: formData,
+      });
+    } else {
+      // Use JSON for regular updates
+      response = await fetch(`${API_BASE_URL}/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+    }
 
     if (!response.ok) {
       const error = await response.json();

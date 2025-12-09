@@ -1,0 +1,58 @@
+# ========================================
+# WORKING MONGODB & REDIS COMMANDS
+# ========================================
+
+# ALWAYS START HERE:
+cd /Users/sujithdugyala/Desktop/DSGP\ 2
+
+# ========================================
+# MONGODB - WORKING COMMANDS
+# ========================================
+
+# MongoDB Screenshot 1: Show databases
+docker-compose exec mongodb mongosh admin -u admin -p kayak_mongo_pass --eval "show dbs"
+
+# MongoDB Screenshot 2: Show collections in kayak_db
+docker-compose exec mongodb mongosh kayak_db -u admin -p kayak_mongo_pass --authenticationDatabase admin --eval "db.getCollectionNames()"
+
+# MongoDB Screenshot 3: Count documents in each collection
+docker-compose exec mongodb mongosh kayak_db -u admin -p kayak_mongo_pass --authenticationDatabase admin --eval "db.getCollectionNames().forEach(function(col) { print(col + ': ' + db[col].countDocuments()); })"
+
+# MongoDB Screenshot 4: Show a sample review (if exists)
+docker-compose exec mongodb mongosh kayak_db -u admin -p kayak_mongo_pass --authenticationDatabase admin --eval "db.reviews.findOne()"
+
+# MongoDB Screenshot 5: Show email logs
+docker-compose exec mongodb mongosh kayak_db -u admin -p kayak_mongo_pass --authenticationDatabase admin --eval "db.email_logs.find().limit(3)"
+
+# ========================================
+# REDIS - WORKING COMMANDS
+# ========================================
+
+# Redis Screenshot 1: Cache size
+docker-compose exec redis redis-cli DBSIZE
+
+# Redis Screenshot 2: List cache keys (if any exist)
+docker-compose exec redis redis-cli KEYS '*'
+
+# Redis Screenshot 3: Cache statistics
+docker-compose exec redis redis-cli INFO stats | grep -E "keyspace_hits|keyspace_misses|instantaneous"
+
+# Redis Screenshot 4: Memory usage
+docker-compose exec redis redis-cli INFO memory | grep -E "used_memory_human|used_memory_peak_human"
+
+# Redis Screenshot 5: Server info
+docker-compose exec redis redis-cli INFO server | grep -E "redis_version|uptime_in_seconds"
+
+# ========================================
+# KAFKA - TOPIC LIST
+# ========================================
+
+# Kafka Screenshot: List all topics
+docker-compose exec kafka kafka-topics --list --bootstrap-server localhost:9092
+
+# ========================================
+# NOTE ABOUT REDIS CACHE:
+# Redis will have MORE data AFTER JMeter test completes!
+# Run these commands again after the test finishes (~20 min)
+# to see cache hits and cached data.
+# ========================================

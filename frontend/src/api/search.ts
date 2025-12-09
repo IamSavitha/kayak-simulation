@@ -3,7 +3,7 @@
  * Calls the search service to get aggregated results from flights, hotels, and cars
  */
 
-const SEARCH_API_BASE_URL = import.meta.env.VITE_SEARCH_API_URL || 'http://localhost:8007';
+const SEARCH_API_BASE_URL = '/api/search';
 
 export interface UnifiedSearchParams {
   query?: string;
