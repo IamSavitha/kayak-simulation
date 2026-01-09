@@ -242,7 +242,7 @@ docker-compose.yml - All services
 
 ---
 
-## 💬 QUICK ANSWERS
+## 💬 FAQ
 
 **Q: Why microservices?**  
 A: Independent scaling, fault isolation, tech flexibility
@@ -339,7 +339,7 @@ open jmeter/results/base_s_k_x_report/index.html
 ## 🚀 START SYSTEM
 
 ```bash
-cd /Users/sujithdugyala/Desktop/DSGP\ 2
+cd folderpath 
 docker-compose up -d
 docker-compose ps  # Verify all running
 ```
@@ -349,6 +349,3 @@ docker-compose ps  # Verify all running
 - Admin: http://localhost:3000/admin
 - Services: http://localhost:800X
 
----
-
-**YOU'RE READY! 🎉**

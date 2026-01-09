@@ -1184,9 +1184,8 @@ def cancel_booking(booking_id: int):
 
 ---
 
-# 🎓 PROFESSOR Q&A PREPARATION
 
-## Common Questions & Answers:
+##Common FAQ:
 
 ### **Q: Why did you use microservices architecture?**
 **A:** "We used microservices to achieve:
